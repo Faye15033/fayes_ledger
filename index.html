@@ -74,6 +74,7 @@
   .icon-btn.logged-in img{ width:100%; height:100%; border-radius:50%; object-fit:cover; }
   .cloud-status{ text-align:center; font-size:11.5px; color: var(--ink-faint); margin: -18px 0 20px; letter-spacing:0.05em; }
   .cloud-status.on{ color: var(--sage-deep); }
+  #manualSyncLink{ color: var(--gold); cursor:pointer; text-decoration:underline; }
   #importFile{ display:none; }
 
   /* ---------- Filters row ---------- */
@@ -330,7 +331,7 @@
     </svg>
     <h1 class="title">Faye's手帳</h1>
   </div>
-  <div class="cloud-status" id="cloudStatus">尚未登入・僅存在本機</div>
+  <div class="cloud-status"><span id="cloudStatusText">尚未登入・僅存在本機</span> <a id="manualSyncLink" style="display:none;">立即同步本機資料到雲端</a></div>
 
   <div class="filter-row">
     <div class="month-nav">
@@ -597,8 +598,16 @@ enableIndexedDbPersistence(db).catch(() => {});
   function subscribeCloud(uid){
     if(unsubTx) unsubTx();
     if(unsubOpenings) unsubOpenings();
+    let firstTxSnapshot = true;
     const txCol = collection(db, "users", uid, "transactions");
     unsubTx = onSnapshot(txCol, snap => {
+      if(firstTxSnapshot && snap.empty && transactions.length > 0){
+        // Safety net: don't silently wipe local data on first connect if cloud looks empty.
+        firstTxSnapshot = false;
+        showToast("雲端目前是空的，本機資料尚未同步，可按上方「立即同步」");
+        return;
+      }
+      firstTxSnapshot = false;
       transactions = snap.docs.map(d => d.data());
       saveTxLocal();
       render();
@@ -617,11 +626,13 @@ enableIndexedDbPersistence(db).catch(() => {});
   }
 
   function updateCloudStatusUI(){
-    const el = document.getElementById("cloudStatus");
+    const el = document.getElementById("cloudStatusText");
+    const wrap = el.parentElement;
     const btn = document.getElementById("authBtn");
+    const syncLink = document.getElementById("manualSyncLink");
     if(currentUser){
       el.textContent = `已同步・${currentUser.email || currentUser.displayName || "已登入"}`;
-      el.classList.add("on");
+      wrap.classList.add("on");
       btn.title = (currentUser.email || "已登入") + "（點擊登出）";
       if(currentUser.photoURL){
         btn.innerHTML = `<img src="${currentUser.photoURL}" referrerpolicy="no-referrer">`;
@@ -629,14 +640,33 @@ enableIndexedDbPersistence(db).catch(() => {});
         btn.textContent = (currentUser.displayName || "U").charAt(0);
       }
       btn.classList.add("logged-in");
+      syncLink.style.display = "inline";
     } else {
       el.textContent = "尚未登入・僅存在本機";
-      el.classList.remove("on");
+      wrap.classList.remove("on");
       btn.title = "使用 Google 登入以跨裝置同步";
       btn.textContent = "G";
       btn.classList.remove("logged-in");
+      syncLink.style.display = "none";
     }
   }
+
+  document.getElementById("manualSyncLink").addEventListener("click", async () => {
+    if(!currentUser){ showToast("請先登入"); return; }
+    if(transactions.length === 0){ showToast("這台裝置目前沒有本機資料可以同步"); return; }
+    const ok = confirm(`要把這台裝置本機的 ${transactions.length} 筆紀錄，強制上傳覆蓋到雲端嗎？`);
+    if(!ok) return;
+    showToast("正在同步到雲端…");
+    try{
+      await cloudBatchUpsert(transactions);
+      if(Object.keys(openings).length > 0){
+        await setDoc(doc(db, "users", currentUser.uid, "settings", "openings"), openings);
+      }
+      showToast("同步完成");
+    }catch(e){
+      showToast("同步失敗，請稍後再試");
+    }
+  });
 
   document.getElementById("authBtn").addEventListener("click", () => {
     if(currentUser){
