@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Faye's手帳 · 生活記帳</title>
+<meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <style>
@@ -484,6 +485,7 @@ const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);
 const db = getFirestore(fbApp);
 const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ login_hint: "ck15033@gmail.com" });
 enableIndexedDbPersistence(db).catch(() => {});
 
 (function(){
@@ -548,6 +550,7 @@ enableIndexedDbPersistence(db).catch(() => {});
   function saveOpeningsLocal(){ localStorage.setItem(OPENING_KEY, JSON.stringify(openings)); }
 
   // ---------- Cloud sync (Firebase) ----------
+  const ALLOWED_EMAIL = "ck15033@gmail.com";
   let currentUser = null;
   let unsubTx = null;
   let unsubOpenings = null;
@@ -677,6 +680,11 @@ enableIndexedDbPersistence(db).catch(() => {});
   });
 
   onAuthStateChanged(auth, async (user) => {
+    if(user && user.email !== ALLOWED_EMAIL){
+      alert("這個帳本僅限特定 Google 帳號使用，這個帳號沒有存取權限，即將登出。");
+      await signOut(auth);
+      return;
+    }
     currentUser = user;
     updateCloudStatusUI();
     if(user){
