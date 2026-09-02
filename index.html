@@ -132,6 +132,8 @@
   .acct-line .a-amt{ font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif; font-weight:700; font-size:16.5px; }
   .acct-line .a-amt.asset{ color: var(--sage-deep); }
   .acct-line .a-amt.liability{ color: var(--clay-deep); }
+  .acct-line .a-amt.warning{ color: var(--clay-deep); background: var(--clay-soft); padding:2px 8px; border-radius:8px; font-size:14px; }
+  .warning-inline{ color: var(--clay-deep); font-weight:700; }
   .acct-line .a-sub{ font-size:12px; color: var(--ink-faint); display:block; text-align:right; }
 
   /* ---------- Breakdown ---------- */
@@ -182,6 +184,12 @@
   .mh-row .mh-nums{ display:flex; gap:16px; font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif; font-weight:700; font-size:14px; }
   .mh-row .mh-in{ color: var(--sage-deep); }
   .mh-row .mh-out{ color: var(--clay-deep); }
+  .mh-row .mh-bal{ color: var(--gold); }
+  .mh-row.mh-header{ background:none; box-shadow:none; padding: 4px 16px; margin-bottom:2px; }
+  .mh-row.mh-header .mh-month{ color: var(--ink-faint); font-size:11.5px; letter-spacing:0.08em; font-family:"Noto Sans TC",sans-serif; }
+  .mh-row.mh-header .mh-nums span{ color: var(--ink-faint) !important; font-size:11.5px; font-weight:500; letter-spacing:0.05em; }
+  .mh-row .mh-nums{ min-width: 210px; justify-content:space-between; }
+  .mh-row .mh-nums span{ min-width: 60px; text-align:right; }
   .mh-empty{ color: var(--ink-faint); font-size:13px; padding: 10px 4px; font-style:italic; }
 
   .trend-controls{ display:flex; align-items:center; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
@@ -276,6 +284,7 @@
   .type-tabs button[data-type="income"].active{ background: var(--sage-soft); color: var(--sage-deep); }
   .type-tabs button[data-type="expense"].active{ background: var(--clay-soft); color: var(--clay-deep); }
   .type-tabs button[data-type="transfer"].active{ background: var(--slate-soft); color: var(--slate-deep); }
+  .type-tabs button[data-mode].active{ background: var(--slate-soft); color: var(--slate-deep); }
 
   .field{ margin-bottom: 16px; }
   .field label{ display:block; font-size:13px; letter-spacing:0.1em; color: var(--ink-soft); margin-bottom: 7px; }
@@ -412,15 +421,20 @@
   </div>
 
   <div class="section-card">
-    <div class="section-title" style="margin-bottom:14px;">— 細項趨勢 —</div>
-    <div class="trend-controls">
-      <div class="type-tabs" id="trendTypeTabs">
-        <button data-type="expense" class="active">支出</button>
-        <button data-type="income">收入</button>
-      </div>
-      <select id="trendCatSelect"></select>
+    <div class="section-head" id="trendToggle">
+      <span class="section-title">— 細項趨勢 —</span>
+      <button class="toggle-btn" id="trendBtn" type="button">+</button>
     </div>
-    <div id="trendChartWrap"></div>
+    <div class="section-body" id="trendBody" style="display:none;">
+      <div class="trend-controls">
+        <div class="type-tabs" id="trendTypeTabs">
+          <button data-type="expense" class="active">支出</button>
+          <button data-type="income">收入</button>
+        </div>
+        <select id="trendCatSelect"></select>
+      </div>
+      <div id="trendChartWrap"></div>
+    </div>
   </div>
 
   <div class="accounts-title"><span>— 帳戶總覽 —</span><span class="edit-link" id="editBalancesLink">設定起始餘額</span></div>
@@ -439,7 +453,7 @@
   <div class="modal">
     <button class="cancel-x" id="modalClose">✕</button>
     <h2>新增一筆</h2>
-    <div class="type-tabs">
+    <div class="type-tabs" id="mainTypeTabs">
       <button data-type="income" class="active">
         <svg class="tab-icon" width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v8M9 10.5c0-1.4 1.3-2.2 3-2.2s3 .8 3 2c0 1.6-1.8 1.8-3 2.2-1.4.4-3 .8-3 2.3 0 1.2 1.3 2 3 2s3-.8 3-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         收入
@@ -455,7 +469,7 @@
     </div>
 
     <form id="txForm" class="type-income">
-      <div class="field">
+      <div class="field" id="categoryField">
         <label>分類</label>
         <div class="cat-grid" id="catGrid"></div>
         <input type="hidden" id="catValue" required>
@@ -467,6 +481,10 @@
       </div>
 
       <div class="field" id="transferFields" style="display:none;">
+        <div class="type-tabs" id="transferModeTabs" style="margin-bottom:16px;">
+          <button type="button" data-mode="twd" class="active">台幣互轉</button>
+          <button type="button" data-mode="fx">外幣互轉</button>
+        </div>
         <div class="row-2">
           <div>
             <label>轉出帳戶</label>
@@ -477,14 +495,30 @@
             <select id="toAcctInput"></select>
           </div>
         </div>
+        <div class="row-2" id="fxAmountFields" style="display:none; margin-top:16px;">
+          <div class="field">
+            <label>轉出金額</label>
+            <div style="display:flex; gap:6px;">
+              <input type="number" id="fxFromAmount" min="0" step="0.01" placeholder="0" style="flex:1;">
+              <select id="fxFromCurrency" style="width:92px;"></select>
+            </div>
+          </div>
+          <div class="field">
+            <label>轉入金額</label>
+            <div style="display:flex; gap:6px;">
+              <input type="number" id="fxToAmount" min="0" step="0.01" placeholder="0" style="flex:1;">
+              <select id="fxToCurrency" style="width:92px;"></select>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="row-3">
-        <div class="field">
+      <div class="row-3" id="mainAmountRow">
+        <div class="field" id="amountField">
           <label>金額</label>
-          <input type="number" id="amountInput" min="0" step="0.01" placeholder="0" required>
+          <input type="number" id="amountInput" min="0" step="0.01" placeholder="0">
         </div>
-        <div class="field">
+        <div class="field" id="currencyField">
           <label>幣別</label>
           <select id="currencyInput"></select>
         </div>
@@ -820,15 +854,17 @@ enableIndexedDbPersistence(db).catch(() => {});
       } else if(t.type === "transfer"){
         const fromA = getAccount(t.fromAccount);
         const toA = getAccount(t.toAccount);
+        const toCur = t.toCurrency || cur;
+        const toAmt = (typeof t.toAmount === "number") ? t.toAmount : t.amount;
         if(fromA){
           if(!(cur in balances[fromA.id])) balances[fromA.id][cur] = 0;
           const flip = (fromA.kind === "liability") ? -1 : 1;
           balances[fromA.id][cur] += -1 * flip * t.amount;
         }
         if(toA){
-          if(!(cur in balances[toA.id])) balances[toA.id][cur] = 0;
+          if(!(toCur in balances[toA.id])) balances[toA.id][toCur] = 0;
           const flip = (toA.kind === "liability") ? -1 : 1;
-          balances[toA.id][cur] += 1 * flip * t.amount;
+          balances[toA.id][toCur] += 1 * flip * toAmt;
         }
       }
     });
@@ -850,16 +886,29 @@ enableIndexedDbPersistence(db).catch(() => {});
           html += `<div class="acct-line"><span class="a-name">${a.name}</span><span class="a-amt ${a.kind}">${a.kind==='liability' ? '－' : (currencySymbol(DEFAULT_CURRENCY)+' 0')}</span></div>`;
         } else if(currencies.length === 1){
           const c = currencies[0];
-          const label = a.kind === "liability" ? "未繳" : "";
-          html += `<div class="acct-line"><span class="a-name">${a.name}</span><span class="a-amt ${a.kind}">${label} ${currencySymbol(c)}${fmt(Math.abs(bal[c]))}</span></div>`;
+          html += `<div class="acct-line"><span class="a-name">${a.name}</span>${acctAmtHtml(a.kind, bal[c], c)}</div>`;
         } else {
-          const lines = currencies.map(c => `${c} ${currencySymbol(c)}${fmt(Math.abs(bal[c]))}`).join("　");
+          const lines = currencies.map(c => acctAmtInline(a.kind, bal[c], c)).join("　");
           html += `<div class="acct-line"><span class="a-name">${a.name}</span><span class="a-sub">${lines}</span></div>`;
         }
       });
       card.innerHTML = html;
       acctGroups.appendChild(card);
     });
+  }
+  function acctAmtHtml(kind, amt, cur){
+    if(kind === "liability"){
+      return `<span class="a-amt liability">未繳 ${currencySymbol(cur)}${fmt(Math.abs(amt))}</span>`;
+    }
+    if(amt < -0.005){
+      return `<span class="a-amt warning">⚠ 餘額不足 -${currencySymbol(cur)}${fmt(Math.abs(amt))}</span>`;
+    }
+    return `<span class="a-amt asset">${currencySymbol(cur)}${fmt(amt)}</span>`;
+  }
+  function acctAmtInline(kind, amt, cur){
+    if(kind === "liability") return `${cur} ${currencySymbol(cur)}${fmt(Math.abs(amt))}`;
+    if(amt < -0.005) return `<span class="warning-inline">⚠ ${cur} -${currencySymbol(cur)}${fmt(Math.abs(amt))}</span>`;
+    return `${cur} ${currencySymbol(cur)}${fmt(amt)}`;
   }
 
   // ---------- Monthly history (collapsible) ----------
@@ -878,12 +927,19 @@ enableIndexedDbPersistence(db).catch(() => {});
       el.innerHTML = '<div class="mh-empty">還沒有任何紀錄</div>';
       return;
     }
-    el.innerHTML = keys.map(key => {
+    const header = `<div class="mh-row mh-header">
+      <span class="mh-month">月份</span>
+      <span class="mh-nums"><span class="mh-in">收入</span><span class="mh-out">支出</span><span class="mh-bal">結餘</span></span>
+    </div>`;
+    el.innerHTML = header + keys.map(key => {
       const [y, m] = key.split("-");
       const d = byMonth[key];
+      const bal = d.income - d.expense;
+      const balClass = bal >= 0 ? "mh-in" : "mh-out";
+      const balSign = bal >= 0 ? "+" : "−";
       return `<div class="mh-row">
         <span class="mh-month">${y} 年 ${parseInt(m,10)} 月</span>
-        <span class="mh-nums"><span class="mh-in">+${fmt(d.income)}</span><span class="mh-out">−${fmt(d.expense)}</span></span>
+        <span class="mh-nums"><span class="mh-in">+${fmt(d.income)}</span><span class="mh-out">−${fmt(d.expense)}</span><span class="${balClass}">${balSign}${fmt(Math.abs(bal))}</span></span>
       </div>`;
     }).join("");
   }
@@ -897,6 +953,15 @@ enableIndexedDbPersistence(db).catch(() => {});
     monthlyHistoryBtn.textContent = "+";
   }
   document.getElementById("monthlyHistoryToggle").addEventListener("click", toggleMonthlyHistory);
+
+  const trendBtn = document.getElementById("trendBtn");
+  const trendBody = document.getElementById("trendBody");
+  function toggleTrendSection(){
+    const open = trendBody.style.display !== "none";
+    trendBody.style.display = open ? "none" : "block";
+    trendBtn.classList.toggle("open", !open);
+  }
+  document.getElementById("trendToggle").addEventListener("click", toggleTrendSection);
 
   // ---------- Category trend ----------
   let trendType = "expense";
@@ -1098,6 +1163,11 @@ enableIndexedDbPersistence(db).catch(() => {});
           ? `<div class="tx-check ${t.reconciled?'checked':''}" data-id="${t.id}" title="信用卡勾稽">${t.reconciled?'✓':''}</div>`
           : `<div style="width:16px;"></div>`;
 
+        const isFxTransfer = t.type === "transfer" && typeof t.toAmount === "number" && (t.toCurrency || cur) !== cur;
+        const amtHtml = isFxTransfer
+          ? `<div class="tx-amt" style="font-size:15px;">－${sym}${fmt(t.amount)}<br>＋${currencySymbol(t.toCurrency)}${fmt(t.toAmount)}</div>`
+          : `<div class="tx-amt">${sign} ${sym}${fmt(t.amount)}</div>`;
+
         card.innerHTML = `
           <div class="tx-left">
             ${checkHtml}
@@ -1108,7 +1178,7 @@ enableIndexedDbPersistence(db).catch(() => {});
             </div>
           </div>
           <div class="tx-right">
-            <div class="tx-amt">${sign} ${sym}${fmt(t.amount)}</div>
+            ${amtHtml}
             <button class="tx-del" data-id="${t.id}">✕</button>
           </div>
         `;
@@ -1143,6 +1213,7 @@ enableIndexedDbPersistence(db).catch(() => {});
   const catGrid = document.getElementById("catGrid");
   const catValue = document.getElementById("catValue");
   const singleAcctField = document.getElementById("singleAcctField");
+  const categoryField = document.getElementById("categoryField");
   const transferFields = document.getElementById("transferFields");
   const acctInput = document.getElementById("acctInput");
   const fromAcctInput = document.getElementById("fromAcctInput");
@@ -1166,15 +1237,54 @@ enableIndexedDbPersistence(db).catch(() => {});
     });
   }
   [acctInput, fromAcctInput, toAcctInput].forEach(fillAccountSelect);
-  Object.keys(CURRENCIES).forEach(code => {
-    const opt = document.createElement("option");
-    opt.value = code; opt.textContent = CURRENCIES[code].label;
-    currencyInput.appendChild(opt);
+  const fxFromAmount = document.getElementById("fxFromAmount");
+  const fxToAmount = document.getElementById("fxToAmount");
+  const fxFromCurrency = document.getElementById("fxFromCurrency");
+  const fxToCurrency = document.getElementById("fxToCurrency");
+  const fxAmountFields = document.getElementById("fxAmountFields");
+  const amountField = document.getElementById("amountField");
+  const currencyField = document.getElementById("currencyField");
+  [currencyInput, fxFromCurrency, fxToCurrency].forEach(sel => {
+    Object.keys(CURRENCIES).forEach(code => {
+      const opt = document.createElement("option");
+      opt.value = code; opt.textContent = sel === currencyInput ? CURRENCIES[code].label : code;
+      sel.appendChild(opt);
+    });
+  });
+
+  let transferMode = "twd";
+  function setTransferMode(mode){
+    transferMode = mode;
+    document.querySelectorAll("#transferModeTabs button").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+    const isFx = mode === "fx";
+    fxAmountFields.style.display = isFx ? "grid" : "none";
+    amountField.style.display = isFx ? "none" : "block";
+    currencyField.style.display = "none"; // transfer currency is decided by the twd/fx mode, not this generic selector
+    if(isFx){
+      fxFromCurrency.value = DEFAULT_CURRENCY;
+      fxToCurrency.value = DEFAULT_CURRENCY;
+    }
+  }
+  document.querySelectorAll("#transferModeTabs button").forEach(btn => {
+    btn.addEventListener("click", () => setTransferMode(btn.dataset.mode));
   });
 
   let activeType = "income";
 
+  function resetFormToIncomeTab(){
+    activeType = "income";
+    form.className = "type-income";
+    document.querySelectorAll("#mainTypeTabs button").forEach(b => b.classList.toggle("active", b.dataset.type === "income"));
+    transferFields.style.display = "none";
+    singleAcctField.style.display = "block";
+    categoryField.style.display = "block";
+    amountField.style.display = "block";
+    currencyField.style.display = "block";
+    catValue.value = "";
+    renderCatGrid();
+  }
   function openModal(){
+    resetFormToIncomeTab();
     dateInput.value = new Date().toISOString().slice(0,10);
     currencyInput.value = DEFAULT_CURRENCY;
     overlay.classList.add("open");
@@ -1182,24 +1292,30 @@ enableIndexedDbPersistence(db).catch(() => {});
   function closeModal(){
     overlay.classList.remove("open");
     form.reset();
-    catValue.value = "";
-    renderCatGrid();
   }
   fab.addEventListener("click", openModal);
   modalClose.addEventListener("click", closeModal);
   overlay.addEventListener("click", (e) => { if(e.target === overlay) closeModal(); });
 
-  document.querySelectorAll(".type-tabs button").forEach(btn => {
+  document.querySelectorAll("#mainTypeTabs button").forEach(btn => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".type-tabs button").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll("#mainTypeTabs button").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       activeType = btn.dataset.type;
       form.className = "type-" + activeType;
       const isTransfer = activeType === "transfer";
       transferFields.style.display = isTransfer ? "block" : "none";
       singleAcctField.style.display = isTransfer ? "none" : "block";
-      catValue.value = "";
-      renderCatGrid();
+      categoryField.style.display = isTransfer ? "none" : "block";
+      if(isTransfer){
+        catValue.value = CATS.transfer[0];
+        setTransferMode("twd");
+      } else {
+        catValue.value = "";
+        currencyField.style.display = "block";
+        amountField.style.display = "block";
+        renderCatGrid();
+      }
     });
   });
 
@@ -1222,20 +1338,36 @@ enableIndexedDbPersistence(db).catch(() => {});
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     if(!catValue.value){ showToast("請選擇分類"); return; }
-    const amt = parseFloat(amountInput.value);
-    if(!amt || amt <= 0){ showToast("請輸入金額"); return; }
+
+    const isFxTransfer = activeType === "transfer" && transferMode === "fx";
+    let amt, cur, toAmt, toCur;
+    if(isFxTransfer){
+      amt = parseFloat(fxFromAmount.value);
+      toAmt = parseFloat(fxToAmount.value);
+      cur = fxFromCurrency.value;
+      toCur = fxToCurrency.value;
+      if(!amt || amt <= 0 || !toAmt || toAmt <= 0){ showToast("請輸入轉出與轉入金額"); return; }
+    } else {
+      amt = parseFloat(amountInput.value);
+      cur = (activeType === "transfer") ? DEFAULT_CURRENCY : (currencyInput.value || DEFAULT_CURRENCY);
+      if(!amt || amt <= 0){ showToast("請輸入金額"); return; }
+    }
 
     const tx = {
       id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())),
       type: activeType,
       category: catValue.value,
       amount: amt,
-      currency: currencyInput.value || DEFAULT_CURRENCY,
+      currency: cur,
       date: dateInput.value,
       note: noteInput.value.trim(),
       createdAt: Date.now(),
       reconciled: false
     };
+    if(isFxTransfer){
+      tx.toAmount = toAmt;
+      tx.toCurrency = toCur;
+    }
     if(activeType === "transfer"){
       tx.fromAccount = fromAcctInput.value;
       tx.toAccount = toAcctInput.value;
