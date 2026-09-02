@@ -156,6 +156,46 @@
 
   /* ---------- Transaction list ---------- */
   .list-title{ font-family:"Noto Serif TC", serif; font-size:15.5px; letter-spacing:0.12em; color: var(--ink-soft); margin: 6px 4px 12px; }
+
+  /* ---------- New: section cards (monthly history / category trend) ---------- */
+  .section-card{ margin: 30px 0; }
+  .section-title{ font-family:"Noto Serif TC", serif; font-size:15.5px; letter-spacing:0.12em; color: var(--ink-soft); }
+  .section-head{
+    display:flex; align-items:center; justify-content:space-between;
+    cursor:pointer; padding: 4px; margin-bottom: 4px;
+  }
+  .toggle-btn{
+    width:30px; height:30px; border-radius:50%; border:1px solid var(--line);
+    background: var(--card); color: var(--ink-soft); font-size:16px; line-height:1;
+    cursor:pointer; transition: all .2s ease; flex-shrink:0;
+  }
+  .toggle-btn:hover{ border-color: var(--gold); color: var(--gold); }
+  .toggle-btn.open{ transform: rotate(45deg); }
+  .section-body{ margin-top: 14px; }
+
+  .mh-row{
+    display:flex; align-items:center; justify-content:space-between;
+    background: var(--card); border-radius: 12px; padding: 12px 16px; margin-bottom: 8px;
+    box-shadow: 0 2px 8px rgba(74,67,57,0.05);
+  }
+  .mh-row .mh-month{ font-family:"Noto Serif TC", serif; font-size:14px; letter-spacing:0.06em; }
+  .mh-row .mh-nums{ display:flex; gap:16px; font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif; font-weight:700; font-size:14px; }
+  .mh-row .mh-in{ color: var(--sage-deep); }
+  .mh-row .mh-out{ color: var(--clay-deep); }
+  .mh-empty{ color: var(--ink-faint); font-size:13px; padding: 10px 4px; font-style:italic; }
+
+  .trend-controls{ display:flex; align-items:center; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
+  .trend-controls .type-tabs{ width: 160px; margin-bottom:0; }
+  .trend-controls select{
+    flex:1; min-width:140px; border:1px solid var(--line); background:#fff; border-radius:10px;
+    padding:9px 12px; font-size:13.5px; font-family:"Noto Sans TC",sans-serif; color: var(--ink);
+  }
+  .trend-empty{
+    text-align:center; color: var(--ink-faint); font-size:13px; font-style:italic; padding: 40px 10px;
+    background: var(--card); border-radius:14px; box-shadow: var(--shadow);
+  }
+  .trend-chart-card{ background: var(--card); border-radius:14px; padding:20px 16px 14px; box-shadow: var(--shadow); }
+  .trend-total{ text-align:center; font-size:12.5px; color: var(--ink-soft); margin-top:6px; letter-spacing:0.04em; }
   .day-group{ margin-bottom: 18px; }
   .day-head{ display:flex; align-items:center; gap:10px; color: var(--ink-faint); font-size:13.5px; letter-spacing:0.08em; margin: 0 4px 8px; }
   .day-head .line{ flex:1; height:1px; background: repeating-linear-gradient(90deg, var(--line) 0 4px, transparent 4px 8px); }
@@ -353,9 +393,6 @@
 
   <div class="fx-summary" id="fxSummary"></div>
 
-  <div class="accounts-title"><span>— 帳戶總覽 —</span><span class="edit-link" id="editBalancesLink">設定起始餘額</span></div>
-  <div class="acct-groups" id="acctGroups"></div>
-
   <div class="breakdown">
     <div class="bd-card income"><h3><span class="dot"></span>收入分佈</h3><div id="bdIncome"></div></div>
     <div class="bd-card expense"><h3><span class="dot"></span>支出分佈</h3><div id="bdExpense"></div></div>
@@ -363,6 +400,31 @@
 
   <div class="list-title">— 本月紀錄 —</div>
   <div id="txList"></div>
+
+  <div class="section-card">
+    <div class="section-head" id="monthlyHistoryToggle">
+      <span class="section-title">— 月度總覽 —</span>
+      <button class="toggle-btn" id="monthlyHistoryBtn" type="button">+</button>
+    </div>
+    <div class="section-body" id="monthlyHistoryBody" style="display:none;">
+      <div id="monthlyHistoryList"></div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-title" style="margin-bottom:14px;">— 細項趨勢 —</div>
+    <div class="trend-controls">
+      <div class="type-tabs" id="trendTypeTabs">
+        <button data-type="expense" class="active">支出</button>
+        <button data-type="income">收入</button>
+      </div>
+      <select id="trendCatSelect"></select>
+    </div>
+    <div id="trendChartWrap"></div>
+  </div>
+
+  <div class="accounts-title"><span>— 帳戶總覽 —</span><span class="edit-link" id="editBalancesLink">設定起始餘額</span></div>
+  <div class="acct-groups" id="acctGroups"></div>
 
   <footer class="note">
     資料儲存在此瀏覽器中,關閉分頁不會遺失,但建議定期按 ⇩ 匯出備份。<br>
@@ -800,6 +862,125 @@ enableIndexedDbPersistence(db).catch(() => {});
     });
   }
 
+  // ---------- Monthly history (collapsible) ----------
+  function renderMonthlyHistory(){
+    const el = document.getElementById("monthlyHistoryList");
+    const byMonth = {};
+    transactions.forEach(t => {
+      if(txCurrency(t) !== DEFAULT_CURRENCY) return;
+      const key = t.date.slice(0,7);
+      if(!byMonth[key]) byMonth[key] = { income: 0, expense: 0 };
+      if(t.type === "income") byMonth[key].income += t.amount;
+      else if(t.type === "expense") byMonth[key].expense += t.amount;
+    });
+    const keys = Object.keys(byMonth).sort().reverse();
+    if(keys.length === 0){
+      el.innerHTML = '<div class="mh-empty">還沒有任何紀錄</div>';
+      return;
+    }
+    el.innerHTML = keys.map(key => {
+      const [y, m] = key.split("-");
+      const d = byMonth[key];
+      return `<div class="mh-row">
+        <span class="mh-month">${y} 年 ${parseInt(m,10)} 月</span>
+        <span class="mh-nums"><span class="mh-in">+${fmt(d.income)}</span><span class="mh-out">−${fmt(d.expense)}</span></span>
+      </div>`;
+    }).join("");
+  }
+
+  const monthlyHistoryBtn = document.getElementById("monthlyHistoryBtn");
+  const monthlyHistoryBody = document.getElementById("monthlyHistoryBody");
+  function toggleMonthlyHistory(){
+    const open = monthlyHistoryBody.style.display !== "none";
+    monthlyHistoryBody.style.display = open ? "none" : "block";
+    monthlyHistoryBtn.classList.toggle("open", !open);
+    monthlyHistoryBtn.textContent = "+";
+  }
+  document.getElementById("monthlyHistoryToggle").addEventListener("click", toggleMonthlyHistory);
+
+  // ---------- Category trend ----------
+  let trendType = "expense";
+  const trendCatSelect = document.getElementById("trendCatSelect");
+  function fillTrendCatSelect(){
+    trendCatSelect.innerHTML = "";
+    CATS[trendType].forEach(cat => {
+      const opt = document.createElement("option");
+      opt.value = cat; opt.textContent = cat;
+      trendCatSelect.appendChild(opt);
+    });
+  }
+  fillTrendCatSelect();
+  document.querySelectorAll("#trendTypeTabs button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("#trendTypeTabs button").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      trendType = btn.dataset.type;
+      fillTrendCatSelect();
+      renderTrendChart();
+    });
+  });
+  trendCatSelect.addEventListener("change", renderTrendChart);
+
+  function renderTrendChart(){
+    const wrap = document.getElementById("trendChartWrap");
+    if(!wrap) return;
+    const cat = trendCatSelect.value;
+    const byMonth = {};
+    transactions.forEach(t => {
+      if(t.type !== trendType) return;
+      if(t.category !== cat) return;
+      if(txCurrency(t) !== DEFAULT_CURRENCY) return;
+      const key = t.date.slice(0,7);
+      byMonth[key] = (byMonth[key] || 0) + t.amount;
+    });
+    const keys = Object.keys(byMonth).sort();
+    if(keys.length === 0){
+      wrap.innerHTML = `<div class="trend-empty">「${cat}」目前還沒有台幣紀錄可以畫趨勢圖</div>`;
+      return;
+    }
+    const values = keys.map(k => byMonth[k]);
+    const total = values.reduce((a,b) => a+b, 0);
+    const max = Math.max(...values, 1);
+    const W = 640, H = 220, padL = 44, padR = 20, padT = 20, padB = 32;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const stepX = keys.length > 1 ? plotW / (keys.length - 1) : 0;
+    const color = trendType === "income" ? "var(--sage)" : "var(--clay)";
+    const colorDeep = trendType === "income" ? "var(--sage-deep)" : "var(--clay-deep)";
+    const fillColor = trendType === "income" ? "var(--sage-soft)" : "var(--clay-soft)";
+
+    const points = values.map((v, i) => {
+      const x = padL + (keys.length === 1 ? plotW/2 : stepX * i);
+      const y = padT + plotH - (v / max) * plotH;
+      return { x, y, v, key: keys[i] };
+    });
+    const linePath = points.map((p,i) => (i===0?"M":"L") + p.x.toFixed(1) + "," + p.y.toFixed(1)).join(" ");
+    const areaPath = linePath + ` L ${points[points.length-1].x.toFixed(1)},${(padT+plotH).toFixed(1)} L ${points[0].x.toFixed(1)},${(padT+plotH).toFixed(1)} Z`;
+
+    const labelEvery = keys.length > 8 ? Math.ceil(keys.length / 8) : 1;
+    const xLabels = points.map((p,i) => {
+      if(i % labelEvery !== 0 && i !== points.length-1) return "";
+      const [y,m] = p.key.split("-");
+      return `<text x="${p.x.toFixed(1)}" y="${H-10}" font-size="10.5" text-anchor="middle" fill="var(--ink-faint)">${parseInt(m,10)}月</text>`;
+    }).join("");
+
+    const dots = points.map(p =>
+      `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.2" fill="${colorDeep}"><title>${p.key}：${fmt(p.v)}</title></circle>`
+    ).join("");
+
+    wrap.innerHTML = `
+      <div class="trend-chart-card">
+        <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">
+          <line x1="${padL}" y1="${padT+plotH}" x2="${W-padR}" y2="${padT+plotH}" stroke="var(--line)" stroke-width="1"/>
+          <path d="${areaPath}" fill="${fillColor}" opacity="0.7"/>
+          <path d="${linePath}" fill="none" stroke="${color}" stroke-width="2"/>
+          ${dots}
+          ${xLabels}
+        </svg>
+        <div class="trend-total">${cat}累計 ${trendType==='income'?'收入':'支出'} NT$ ${fmt(total)}（近 ${keys.length} 個月）</div>
+      </div>
+    `;
+  }
+
   function render(){
     monthLabel.textContent = current.getFullYear() + " 年 " + (current.getMonth()+1) + " 月";
     const key = monthKey(current);
@@ -832,6 +1013,8 @@ enableIndexedDbPersistence(db).catch(() => {});
     renderFxSummary(fxIncome, fxExpense);
     renderList(monthTx);
     renderAccounts();
+    renderMonthlyHistory();
+    renderTrendChart();
   }
 
   function renderBreakdown(container, byCat, total, type){
