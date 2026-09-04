@@ -293,6 +293,9 @@
     padding: 11px 13px; font-size: 16px; font-family: "Noto Sans TC", sans-serif; color: var(--ink);
     outline:none; transition: border-color .2s;
   }
+  input[type="number"]{ -moz-appearance: textfield; appearance: textfield; }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button{ -webkit-appearance: none; margin: 0; }
   .field input:focus, .field select:focus{ border-color: var(--gold); }
 
   .cat-grid{ display:grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -454,13 +457,13 @@
     <button class="cancel-x" id="modalClose">✕</button>
     <h2>新增一筆</h2>
     <div class="type-tabs" id="mainTypeTabs">
-      <button data-type="income" class="active">
-        <svg class="tab-icon" width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v8M9 10.5c0-1.4 1.3-2.2 3-2.2s3 .8 3 2c0 1.6-1.8 1.8-3 2.2-1.4.4-3 .8-3 2.3 0 1.2 1.3 2 3 2s3-.8 3-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        收入
-      </button>
-      <button data-type="expense">
+      <button data-type="expense" class="active">
         <svg class="tab-icon" width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M6 8h12l-1 12H7L6 8Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8" stroke="currentColor" stroke-width="1.6"/></svg>
         支出
+      </button>
+      <button data-type="income">
+        <svg class="tab-icon" width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v8M9 10.5c0-1.4 1.3-2.2 3-2.2s3 .8 3 2c0 1.6-1.8 1.8-3 2.2-1.4.4-3 .8-3 2.3 0 1.2 1.3 2 3 2s3-.8 3-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        收入
       </button>
       <button data-type="transfer">
         <svg class="tab-icon" width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 9h13M13 5l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 15H7M11 11l-4 4 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -468,7 +471,7 @@
       </button>
     </div>
 
-    <form id="txForm" class="type-income">
+    <form id="txForm" class="type-expense">
       <div class="field" id="categoryField">
         <label>分類</label>
         <div class="cat-grid" id="catGrid"></div>
@@ -499,14 +502,14 @@
           <div class="field">
             <label>轉出金額</label>
             <div style="display:flex; gap:6px;">
-              <input type="number" id="fxFromAmount" min="0" step="0.01" placeholder="0" style="flex:1;">
+              <input type="number" id="fxFromAmount" min="0" step="0.01" inputmode="decimal" placeholder="0" style="flex:1;">
               <select id="fxFromCurrency" style="width:92px;"></select>
             </div>
           </div>
           <div class="field">
             <label>轉入金額</label>
             <div style="display:flex; gap:6px;">
-              <input type="number" id="fxToAmount" min="0" step="0.01" placeholder="0" style="flex:1;">
+              <input type="number" id="fxToAmount" min="0" step="0.01" inputmode="decimal" placeholder="0" style="flex:1;">
               <select id="fxToCurrency" style="width:92px;"></select>
             </div>
           </div>
@@ -516,7 +519,7 @@
       <div class="row-3" id="mainAmountRow">
         <div class="field" id="amountField">
           <label>金額</label>
-          <input type="number" id="amountInput" min="0" step="0.01" placeholder="0">
+          <input type="number" id="amountInput" min="0" step="0.01" inputmode="decimal" placeholder="0">
         </div>
         <div class="field" id="currencyField">
           <label>幣別</label>
@@ -822,6 +825,15 @@ enableIndexedDbPersistence(db).catch(() => {});
 
   function fmt(n){ return Math.round(n).toLocaleString("zh-Hant"); }
   function monthKey(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0"); }
+
+  function sanitizeNumericInput(el){
+    el.addEventListener("input", () => {
+      let v = el.value.replace(/[^0-9.]/g, "");
+      const parts = v.split(".");
+      if(parts.length > 2) v = parts[0] + "." + parts.slice(1).join("");
+      el.value = v;
+    });
+  }
 
   // ---------- Account filter dropdown ----------
   ACCOUNT_GROUPS.forEach(group => {
@@ -1189,6 +1201,7 @@ enableIndexedDbPersistence(db).catch(() => {});
 
     txList.querySelectorAll(".tx-del").forEach(btn => {
       btn.addEventListener("click", () => {
+        if(!confirm("確定要刪除這筆紀錄嗎？此動作無法復原。")) return;
         persistTxDelete(btn.dataset.id);
         showToast("已刪除");
       });
@@ -1219,6 +1232,7 @@ enableIndexedDbPersistence(db).catch(() => {});
   const fromAcctInput = document.getElementById("fromAcctInput");
   const toAcctInput = document.getElementById("toAcctInput");
   const amountInput = document.getElementById("amountInput");
+  sanitizeNumericInput(amountInput);
   const currencyInput = document.getElementById("currencyInput");
   const dateInput = document.getElementById("dateInput");
   const noteInput = document.getElementById("noteInput");
@@ -1239,6 +1253,8 @@ enableIndexedDbPersistence(db).catch(() => {});
   [acctInput, fromAcctInput, toAcctInput].forEach(fillAccountSelect);
   const fxFromAmount = document.getElementById("fxFromAmount");
   const fxToAmount = document.getElementById("fxToAmount");
+  sanitizeNumericInput(fxFromAmount);
+  sanitizeNumericInput(fxToAmount);
   const fxFromCurrency = document.getElementById("fxFromCurrency");
   const fxToCurrency = document.getElementById("fxToCurrency");
   const fxAmountFields = document.getElementById("fxAmountFields");
@@ -1271,10 +1287,10 @@ enableIndexedDbPersistence(db).catch(() => {});
 
   let activeType = "income";
 
-  function resetFormToIncomeTab(){
-    activeType = "income";
-    form.className = "type-income";
-    document.querySelectorAll("#mainTypeTabs button").forEach(b => b.classList.toggle("active", b.dataset.type === "income"));
+  function resetFormToDefaultTab(){
+    activeType = "expense";
+    form.className = "type-expense";
+    document.querySelectorAll("#mainTypeTabs button").forEach(b => b.classList.toggle("active", b.dataset.type === "expense"));
     transferFields.style.display = "none";
     singleAcctField.style.display = "block";
     categoryField.style.display = "block";
@@ -1284,7 +1300,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     renderCatGrid();
   }
   function openModal(){
-    resetFormToIncomeTab();
+    resetFormToDefaultTab();
     dateInput.value = new Date().toISOString().slice(0,10);
     currencyInput.value = DEFAULT_CURRENCY;
     overlay.classList.add("open");
@@ -1482,7 +1498,8 @@ enableIndexedDbPersistence(db).catch(() => {});
       sel.appendChild(opt);
     });
     const input = document.createElement("input");
-    input.type = "number"; input.step = "0.01"; input.value = amt;
+    input.type = "number"; input.step = "0.01"; input.inputMode = "decimal"; input.value = amt;
+    sanitizeNumericInput(input);
     const rm = document.createElement("button");
     rm.type = "button"; rm.className = "ob-rm"; rm.textContent = "✕";
     rm.addEventListener("click", () => row.remove());
@@ -1496,6 +1513,9 @@ enableIndexedDbPersistence(db).catch(() => {});
   obOverlay.addEventListener("click", (e) => { if(e.target === obOverlay) closeOnboarding(); });
 
   obSave.addEventListener("click", () => {
+    if(Object.keys(openings).length > 0){
+      if(!confirm("你已經設定過起始餘額，再次儲存將會覆蓋原本的數值，確定要覆蓋嗎？")) return;
+    }
     const newOpenings = {};
     obGroups.querySelectorAll(".ob-account").forEach(box => {
       const acctId = box.dataset.acct;
