@@ -320,8 +320,6 @@
   .save-btn.ghost{ background: var(--card-soft); color: var(--ink-soft); margin-top:10px; }
   .cancel-x{ position:absolute; top:20px; right:20px; background:none; border:none; color: var(--ink-faint); font-size:20px; cursor:pointer; }
 
-  footer.note{ text-align:center; margin-top: 40px; font-size:13px; color: var(--ink-faint); line-height:1.9; }
-  footer.note a{ color: var(--gold); cursor:pointer; text-decoration:underline; }
 
   .toast{
     position:fixed; bottom: 100px; left:50%; transform: translateX(-50%) translateY(10px);
@@ -443,10 +441,6 @@
   <div class="accounts-title"><span>— 帳戶總覽 —</span><span class="edit-link" id="editBalancesLink">設定起始餘額</span></div>
   <div class="acct-groups" id="acctGroups"></div>
 
-  <footer class="note">
-    資料儲存在此瀏覽器中,關閉分頁不會遺失,但建議定期按 ⇩ 匯出備份。<br>
-    想跨裝置同步請見 <a id="cloudInfo">雲端同步說明</a>
-  </footer>
 </div>
 
 <button class="fab" id="fabAdd">+</button>
@@ -700,16 +694,8 @@ enableIndexedDbPersistence(db).catch(() => {});
   function subscribeCloud(uid){
     if(unsubTx) unsubTx();
     if(unsubOpenings) unsubOpenings();
-    let firstTxSnapshot = true;
     const txCol = collection(db, "users", uid, "transactions");
     unsubTx = onSnapshot(txCol, snap => {
-      if(firstTxSnapshot && snap.empty && transactions.length > 0){
-        // Safety net: don't silently wipe local data on first connect if cloud looks empty.
-        firstTxSnapshot = false;
-        showToast("雲端目前是空的，本機資料尚未同步，可按上方「立即同步」");
-        return;
-      }
-      firstTxSnapshot = false;
       transactions = snap.docs.map(d => d.data());
       saveTxLocal();
       render();
@@ -756,15 +742,24 @@ enableIndexedDbPersistence(db).catch(() => {});
   document.getElementById("manualSyncLink").addEventListener("click", async () => {
     if(!currentUser){ showToast("請先登入"); return; }
     if(transactions.length === 0){ showToast("這台裝置目前沒有本機資料可以同步"); return; }
-    const ok = confirm(`要把這台裝置本機的 ${transactions.length} 筆紀錄，強制上傳覆蓋到雲端嗎？`);
-    if(!ok) return;
-    showToast("正在同步到雲端…");
+    showToast("正在核對雲端資料…");
     try{
-      await cloudBatchUpsert(transactions);
+      const txCol = collection(db, "users", currentUser.uid, "transactions");
+      const snap = await getDocs(txCol);
+      const cloudIds = new Set(snap.docs.map(d => d.id));
+      const missing = transactions.filter(t => !cloudIds.has(t.id));
+      if(missing.length === 0){
+        showToast("資料已經是最新的，不需要同步");
+        return;
+      }
+      const ok = confirm(`偵測到這台裝置有 ${missing.length} 筆紀錄雲端還沒有，要上傳嗎？`);
+      if(!ok) return;
+      showToast("正在同步到雲端…");
+      await cloudBatchUpsert(missing);
       if(Object.keys(openings).length > 0){
         await setDoc(doc(db, "users", currentUser.uid, "settings", "openings"), openings);
       }
-      showToast("同步完成");
+      showToast(`已同步 ${missing.length} 筆`);
     }catch(e){
       showToast("同步失敗，請稍後再試");
     }
@@ -825,6 +820,10 @@ enableIndexedDbPersistence(db).catch(() => {});
 
   function fmt(n){ return Math.round(n).toLocaleString("zh-Hant"); }
   function monthKey(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0"); }
+  function localDateStr(d){
+    d = d || new Date();
+    return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+  }
 
   function sanitizeNumericInput(el){
     el.addEventListener("input", () => {
@@ -1301,7 +1300,7 @@ enableIndexedDbPersistence(db).catch(() => {});
   }
   function openModal(){
     resetFormToDefaultTab();
-    dateInput.value = new Date().toISOString().slice(0,10);
+    dateInput.value = localDateStr();
     currencyInput.value = DEFAULT_CURRENCY;
     overlay.classList.add("open");
   }
@@ -1411,7 +1410,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     const blob = new Blob([JSON.stringify(payload, null, 2)], {type:"application/json"});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    const stamp = new Date().toISOString().slice(0,10);
+    const stamp = localDateStr();
     a.href = url; a.download = `Fayes手帳_備份_${stamp}.json`; a.click();
     URL.revokeObjectURL(url);
     showToast("已匯出備份");
@@ -1450,10 +1449,6 @@ enableIndexedDbPersistence(db).catch(() => {});
       importFile.value = "";
     };
     reader.readAsText(file);
-  });
-
-  document.getElementById("cloudInfo").addEventListener("click", () => {
-    alert("此檔案為單機版：資料存在你目前使用的瀏覽器中。\n\n若想在手機、電腦間同步，需要架設在有網址的伺服器上，並申請 Google Cloud 的 OAuth 用戶端 ID 才能串接 Google 登入與雲端硬碟。目前可以先用右上角「匯出／匯入」功能手動搬移備份檔案。");
   });
 
   // ---------- Onboarding / balance settings ----------
