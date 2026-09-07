@@ -132,6 +132,7 @@
   .acct-line .a-amt{ font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif; font-weight:700; font-size:16.5px; }
   .acct-line .a-amt.asset{ color: var(--sage-deep); }
   .acct-line .a-amt.liability{ color: var(--clay-deep); }
+  .version-note{ text-align:center; margin-top: 34px; font-size:11px; color: var(--ink-faint); letter-spacing:0.03em; }
   .acct-line .a-amt.warning{ color: var(--clay-deep); background: var(--clay-soft); padding:2px 8px; border-radius:8px; font-size:14px; }
   .warning-inline{ color: var(--clay-deep); font-weight:700; }
   .acct-line .a-sub{ font-size:12px; color: var(--ink-faint); display:block; text-align:right; }
@@ -440,6 +441,8 @@
 
   <div class="accounts-title"><span>— 帳戶總覽 —</span><span class="edit-link" id="editBalancesLink">設定起始餘額</span></div>
   <div class="acct-groups" id="acctGroups"></div>
+
+  <div class="version-note" id="versionNote">本檔案由 Faye 設計製作，請勿公開使用</div>
 
 </div>
 
@@ -1533,6 +1536,39 @@ enableIndexedDbPersistence(db).catch(() => {});
   if(!localStorage.getItem(ONBOARD_KEY)){
     openOnboarding();
   }
+
+  // ---------- Version note: ask GitHub when this file was last committed ----------
+  async function loadVersionDate(){
+    const el = document.getElementById("versionNote");
+    const VERSION_CACHE_KEY = "shiguang_ledger_version_date_v1";
+    try{
+      const host = location.hostname; // e.g. "alice.github.io"
+      if(!host.endsWith(".github.io")) throw new Error("not on github pages");
+      const username = host.split(".")[0];
+      const pathParts = location.pathname.split("/").filter(Boolean);
+      const repo = pathParts[0];
+      if(!username || !repo) throw new Error("no repo info in URL");
+      const filePath = pathParts.length > 1 ? pathParts.slice(1).join("/") : "index.html";
+      const apiUrl = `https://api.github.com/repos/${username}/${repo}/commits?path=${encodeURIComponent(filePath)}&per_page=1`;
+      const res = await fetch(apiUrl);
+      if(!res.ok) throw new Error("github api error");
+      const data = await res.json();
+      if(Array.isArray(data) && data[0] && data[0].commit){
+        const d = new Date(data[0].commit.committer.date);
+        const dateStr = d.getFullYear() + "/" + String(d.getMonth()+1).padStart(2,"0") + "/" + String(d.getDate()).padStart(2,"0");
+        localStorage.setItem(VERSION_CACHE_KEY, dateStr);
+        el.textContent = `本檔案由 Faye 設計製作，請勿公開使用　${dateStr}`;
+      } else {
+        throw new Error("no commit data");
+      }
+    }catch(e){
+      const cached = localStorage.getItem(VERSION_CACHE_KEY);
+      el.textContent = cached
+        ? `本檔案由 Faye 設計製作，請勿公開使用　${cached}`
+        : `本檔案由 Faye 設計製作，請勿公開使用`;
+    }
+  }
+  loadVersionDate();
 
   render();
 })();
