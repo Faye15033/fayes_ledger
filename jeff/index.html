@@ -808,6 +808,9 @@ enableIndexedDbPersistence(db).catch(() => {});
 
   function fmt(n){ return Math.round(n).toLocaleString("zh-Hant"); }
   function monthKey(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0"); }
+  function localDateStr(d){
+    return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+  }
 
   // ---------- Account filter dropdown ----------
   ACCOUNT_GROUPS.forEach(group => {
@@ -1264,7 +1267,7 @@ enableIndexedDbPersistence(db).catch(() => {});
   }
   function openModal(){
     resetFormToDefaultTab();
-    dateInput.value = new Date().toISOString().slice(0,10);
+    dateInput.value = localDateStr(new Date());
     currencyInput.value = DEFAULT_CURRENCY;
     overlay.classList.add("open");
   }
@@ -1375,7 +1378,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     const blob = new Blob([JSON.stringify(payload, null, 2)], {type:"application/json"});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    const stamp = new Date().toISOString().slice(0,10);
+    const stamp = localDateStr(new Date());
     a.href = url; a.download = `Jeff手帳_備份_${stamp}.json`; a.click();
     URL.revokeObjectURL(url);
     showToast("已匯出備份");
