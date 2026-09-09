@@ -133,6 +133,23 @@
   .acct-line .a-amt.asset{ color: var(--sage-deep); }
   .acct-line .a-amt.liability{ color: var(--clay-deep); }
   .version-note{ text-align:center; margin-top: 34px; font-size:11px; color: var(--ink-faint); letter-spacing:0.03em; }
+
+  /* ---------- Calculator keypad ---------- */
+  .calc-wrap{ margin: -8px 0 18px; }
+  .calc-preview{
+    text-align:right; font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif;
+    font-size:15px; font-weight:700; color: var(--gold); min-height:20px; padding: 0 4px 8px;
+  }
+  .calc-keypad{ display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; }
+  .calc-key{
+    border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 12px 0;
+    font-size:16px; font-family:"Noto Sans TC",sans-serif; color: var(--ink); cursor:pointer;
+    transition: all .15s ease;
+  }
+  .calc-key:hover{ border-color: var(--gold); background: var(--card-soft); }
+  .calc-key:active{ transform: scale(0.95); }
+  .calc-key.op{ background: var(--slate-soft); color: var(--slate-deep); border-color: transparent; font-weight:600; }
+  .calc-key.wide{ grid-column: span 4; background: var(--card-soft); color: var(--ink-soft); font-size:13.5px; }
   .acct-line .a-amt.warning{ color: var(--clay-deep); background: var(--clay-soft); padding:2px 8px; border-radius:8px; font-size:14px; }
   .warning-inline{ color: var(--clay-deep); font-weight:700; }
   .acct-line .a-sub{ font-size:12px; color: var(--ink-faint); display:block; text-align:right; }
@@ -499,14 +516,14 @@
           <div class="field">
             <label>轉出金額</label>
             <div style="display:flex; gap:6px;">
-              <input type="number" id="fxFromAmount" min="0" step="0.01" inputmode="decimal" placeholder="0" style="flex:1;">
+              <input type="text" id="fxFromAmount" inputmode="none" autocomplete="off" placeholder="0" style="flex:1;">
               <select id="fxFromCurrency" style="width:92px;"></select>
             </div>
           </div>
           <div class="field">
             <label>轉入金額</label>
             <div style="display:flex; gap:6px;">
-              <input type="number" id="fxToAmount" min="0" step="0.01" inputmode="decimal" placeholder="0" style="flex:1;">
+              <input type="text" id="fxToAmount" inputmode="none" autocomplete="off" placeholder="0" style="flex:1;">
               <select id="fxToCurrency" style="width:92px;"></select>
             </div>
           </div>
@@ -516,7 +533,7 @@
       <div class="row-3" id="mainAmountRow">
         <div class="field" id="amountField">
           <label>金額</label>
-          <input type="number" id="amountInput" min="0" step="0.01" inputmode="decimal" placeholder="0">
+          <input type="text" id="amountInput" inputmode="none" autocomplete="off" placeholder="0">
         </div>
         <div class="field" id="currencyField">
           <label>幣別</label>
@@ -525,6 +542,29 @@
         <div class="field">
           <label>日期</label>
           <input type="date" id="dateInput" required>
+        </div>
+      </div>
+
+      <div class="calc-wrap">
+        <div class="calc-preview" id="calcPreview">&nbsp;</div>
+        <div class="calc-keypad">
+          <button type="button" class="calc-key" data-key="7">7</button>
+          <button type="button" class="calc-key" data-key="8">8</button>
+          <button type="button" class="calc-key" data-key="9">9</button>
+          <button type="button" class="calc-key op" data-key="/">÷</button>
+          <button type="button" class="calc-key" data-key="4">4</button>
+          <button type="button" class="calc-key" data-key="5">5</button>
+          <button type="button" class="calc-key" data-key="6">6</button>
+          <button type="button" class="calc-key op" data-key="*">×</button>
+          <button type="button" class="calc-key" data-key="1">1</button>
+          <button type="button" class="calc-key" data-key="2">2</button>
+          <button type="button" class="calc-key" data-key="3">3</button>
+          <button type="button" class="calc-key op" data-key="-">−</button>
+          <button type="button" class="calc-key" id="calcClear">C</button>
+          <button type="button" class="calc-key" data-key="0">0</button>
+          <button type="button" class="calc-key" data-key=".">.</button>
+          <button type="button" class="calc-key op" data-key="+">＋</button>
+          <button type="button" class="calc-key wide" id="calcBackspace">⌫ 倒退</button>
         </div>
       </div>
 
@@ -830,11 +870,19 @@ enableIndexedDbPersistence(db).catch(() => {});
 
   function sanitizeNumericInput(el){
     el.addEventListener("input", () => {
-      let v = el.value.replace(/[^0-9.]/g, "");
-      const parts = v.split(".");
-      if(parts.length > 2) v = parts[0] + "." + parts.slice(1).join("");
-      el.value = v;
+      el.value = el.value.replace(/[^0-9.+\-*/() ]/g, "");
     });
+  }
+  function evaluateExpr(str){
+    if(str == null) return NaN;
+    const cleaned = String(str).trim();
+    if(cleaned === "") return NaN;
+    if(!/^[0-9+\-*/(). ]+$/.test(cleaned)) return NaN;
+    try{
+      const result = Function('"use strict"; return (' + cleaned + ')')();
+      if(typeof result !== "number" || !isFinite(result)) return NaN;
+      return Math.round(result * 100) / 100;
+    }catch(e){ return NaN; }
   }
 
   // ---------- Account filter dropdown ----------
@@ -1262,6 +1310,44 @@ enableIndexedDbPersistence(db).catch(() => {});
   const fxAmountFields = document.getElementById("fxAmountFields");
   const amountField = document.getElementById("amountField");
   const currencyField = document.getElementById("currencyField");
+
+  // ---------- Calculator keypad (shared across amountInput / fxFromAmount / fxToAmount) ----------
+  let activeAmountInput = amountInput;
+  const calcPreview = document.getElementById("calcPreview");
+  function updateCalcPreview(){
+    const val = activeAmountInput ? activeAmountInput.value : "";
+    if(/[+\-*/]/.test(val)){
+      const result = evaluateExpr(val);
+      calcPreview.innerHTML = isNaN(result) ? "&nbsp;" : `= ${fmt(result)}`;
+    } else {
+      calcPreview.innerHTML = "&nbsp;";
+    }
+  }
+  [amountInput, fxFromAmount, fxToAmount].forEach(inp => {
+    inp.addEventListener("focus", () => { activeAmountInput = inp; updateCalcPreview(); });
+    inp.addEventListener("input", updateCalcPreview);
+  });
+  document.querySelectorAll(".calc-key[data-key]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if(!activeAmountInput) activeAmountInput = amountInput;
+      activeAmountInput.value += btn.dataset.key;
+      activeAmountInput.focus();
+      updateCalcPreview();
+    });
+  });
+  document.getElementById("calcClear").addEventListener("click", () => {
+    if(!activeAmountInput) activeAmountInput = amountInput;
+    activeAmountInput.value = "";
+    activeAmountInput.focus();
+    updateCalcPreview();
+  });
+  document.getElementById("calcBackspace").addEventListener("click", () => {
+    if(!activeAmountInput) activeAmountInput = amountInput;
+    activeAmountInput.value = activeAmountInput.value.slice(0, -1);
+    activeAmountInput.focus();
+    updateCalcPreview();
+  });
+
   [currencyInput, fxFromCurrency, fxToCurrency].forEach(sel => {
     Object.keys(CURRENCIES).forEach(code => {
       const opt = document.createElement("option");
@@ -1305,6 +1391,8 @@ enableIndexedDbPersistence(db).catch(() => {});
     resetFormToDefaultTab();
     dateInput.value = localDateStr();
     currencyInput.value = DEFAULT_CURRENCY;
+    activeAmountInput = amountInput;
+    updateCalcPreview();
     overlay.classList.add("open");
   }
   function closeModal(){
@@ -1360,13 +1448,13 @@ enableIndexedDbPersistence(db).catch(() => {});
     const isFxTransfer = activeType === "transfer" && transferMode === "fx";
     let amt, cur, toAmt, toCur;
     if(isFxTransfer){
-      amt = parseFloat(fxFromAmount.value);
-      toAmt = parseFloat(fxToAmount.value);
+      amt = evaluateExpr(fxFromAmount.value);
+      toAmt = evaluateExpr(fxToAmount.value);
       cur = fxFromCurrency.value;
       toCur = fxToCurrency.value;
       if(!amt || amt <= 0 || !toAmt || toAmt <= 0){ showToast("請輸入轉出與轉入金額"); return; }
     } else {
-      amt = parseFloat(amountInput.value);
+      amt = evaluateExpr(amountInput.value);
       cur = (activeType === "transfer") ? DEFAULT_CURRENCY : (currencyInput.value || DEFAULT_CURRENCY);
       if(!amt || amt <= 0){ showToast("請輸入金額"); return; }
     }
