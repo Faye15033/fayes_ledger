@@ -298,6 +298,16 @@
   }
   .field input:focus, .field select:focus{ border-color: var(--gold); }
 
+  .calc-row{ display:flex; align-items:center; gap:6px; margin-top:7px; }
+  .calc-op{
+    width:30px; height:30px; border-radius:8px; border:1px solid var(--line);
+    background: var(--card-soft); color: var(--ink-soft); font-size:14px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    transition: all .15s ease; flex-shrink:0; padding:0;
+  }
+  .calc-op:hover, .calc-op:active{ border-color: var(--gold); color: var(--gold); background: var(--gold-soft); }
+  .calc-preview{ font-size:13px; color: var(--gold); font-weight:600; letter-spacing:0.02em; margin-left:2px; }
+
   .cat-grid{ display:grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .cat-chip{
     border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 9px 4px;
@@ -510,7 +520,14 @@
       <div class="row-3" id="mainAmountRow">
         <div class="field" id="amountField">
           <label>金額</label>
-          <input type="number" id="amountInput" min="0" step="0.01" placeholder="0">
+          <input type="text" inputmode="decimal" id="amountInput" placeholder="0" autocomplete="off">
+          <div class="calc-row">
+            <button type="button" class="calc-op" data-op="+">＋</button>
+            <button type="button" class="calc-op" data-op="-">－</button>
+            <button type="button" class="calc-op" data-op="*">×</button>
+            <button type="button" class="calc-op" data-op="/">÷</button>
+            <span class="calc-preview" id="calcPreview"></span>
+          </div>
         </div>
         <div class="field" id="currencyField">
           <label>幣別</label>
@@ -1211,6 +1228,93 @@ enableIndexedDbPersistence(db).catch(() => {});
   const dateInput = document.getElementById("dateInput");
   const noteInput = document.getElementById("noteInput");
 
+  // ---------- Mini calculator for the amount field ----------
+  function isPlainNumber(str){ return /^-?\d*\.?\d+$/.test(str.trim()); }
+  function evalExpr(str){
+    const cleaned = str.replace(/\s+/g, "").replace(/×/g, "*").replace(/÷/g, "/");
+    if(!cleaned) return NaN;
+    if(!/^[0-9+\-*/().]+$/.test(cleaned)) return NaN;
+    let i = 0;
+    function peek(){ return cleaned[i]; }
+    function parseExpr(){
+      let v = parseTerm();
+      while(peek() === "+" || peek() === "-"){
+        const op = cleaned[i++];
+        const rhs = parseTerm();
+        if(isNaN(rhs)) return NaN;
+        v = op === "+" ? v + rhs : v - rhs;
+      }
+      return v;
+    }
+    function parseTerm(){
+      let v = parseFactor();
+      while(peek() === "*" || peek() === "/"){
+        const op = cleaned[i++];
+        const rhs = parseFactor();
+        if(isNaN(rhs)) return NaN;
+        v = op === "*" ? v * rhs : v / rhs;
+      }
+      return v;
+    }
+    function parseFactor(){
+      if(peek() === "("){
+        i++;
+        const v = parseExpr();
+        if(peek() === ")") i++; else return NaN;
+        return v;
+      }
+      if(peek() === "-"){ i++; const v = parseFactor(); return isNaN(v) ? NaN : -v; }
+      if(peek() === "+"){ i++; return parseFactor(); }
+      const start = i;
+      while(i < cleaned.length && /[0-9.]/.test(cleaned[i])) i++;
+      if(start === i) return NaN;
+      return parseFloat(cleaned.slice(start, i));
+    }
+    const result = parseExpr();
+    if(i !== cleaned.length || isNaN(result)) return NaN;
+    return result;
+  }
+  function resolveAmount(str){
+    if(!str) return NaN;
+    const trimmed = str.trim();
+    if(isPlainNumber(trimmed)) return parseFloat(trimmed);
+    return evalExpr(trimmed);
+  }
+  function formatCalcResult(n){
+    if(!isFinite(n)) return "";
+    const rounded = Math.round(n * 100) / 100;
+    return rounded % 1 === 0 ? String(rounded) : rounded.toFixed(2).replace(/0$/, "");
+  }
+  const calcPreview = document.getElementById("calcPreview");
+  amountInput.addEventListener("input", () => {
+    const val = amountInput.value.trim();
+    if(!val || isPlainNumber(val)){ calcPreview.textContent = ""; return; }
+    const result = evalExpr(val);
+    calcPreview.textContent = (isNaN(result) || !isFinite(result)) ? "" : ("＝ " + formatCalcResult(result));
+  });
+  amountInput.addEventListener("blur", () => {
+    const val = amountInput.value.trim();
+    if(!val || isPlainNumber(val)) return;
+    const result = evalExpr(val);
+    if(!isNaN(result) && isFinite(result)){
+      amountInput.value = formatCalcResult(result);
+      calcPreview.textContent = "";
+    }
+  });
+  document.querySelectorAll(".calc-op").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const op = btn.dataset.op;
+      const start = amountInput.selectionStart ?? amountInput.value.length;
+      const end = amountInput.selectionEnd ?? amountInput.value.length;
+      const val = amountInput.value;
+      amountInput.value = val.slice(0, start) + op + val.slice(end);
+      const newPos = start + op.length;
+      amountInput.focus();
+      amountInput.setSelectionRange(newPos, newPos);
+      amountInput.dispatchEvent(new Event("input"));
+    });
+  });
+
   function fillAccountSelect(sel){
     sel.innerHTML = "";
     ACCOUNT_GROUPS.forEach(group => {
@@ -1280,6 +1384,7 @@ enableIndexedDbPersistence(db).catch(() => {});
   function closeModal(){
     overlay.classList.remove("open");
     form.reset();
+    calcPreview.textContent = "";
   }
   fab.addEventListener("click", openModal);
   modalClose.addEventListener("click", closeModal);
@@ -1336,9 +1441,9 @@ enableIndexedDbPersistence(db).catch(() => {});
       toCur = fxToCurrency.value;
       if(!amt || amt <= 0 || !toAmt || toAmt <= 0){ showToast("請輸入轉出與轉入金額"); return; }
     } else {
-      amt = parseFloat(amountInput.value);
+      amt = resolveAmount(amountInput.value);
       cur = (activeType === "transfer") ? DEFAULT_CURRENCY : (currencyInput.value || DEFAULT_CURRENCY);
-      if(!amt || amt <= 0){ showToast("請輸入金額"); return; }
+      if(!amt || !isFinite(amt) || amt <= 0){ showToast("請輸入正確的金額或算式"); return; }
     }
 
     const tx = {
