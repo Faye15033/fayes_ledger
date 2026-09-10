@@ -613,7 +613,7 @@ enableIndexedDbPersistence(db).catch(() => {});
 (function(){
   const CATS = {
     income: ["薪資","投資獲利","贊助補貼","代收款","中獎"],
-    expense: ["吃的","用的","交通費","住房","電話費","娛樂","愛漂亮","醫療","捲捲","旅行","家人","捐贈","保險","代購","其他"],
+    expense: ["吃的","用的","交通費","住房","電話及APP","娛樂","愛漂亮","醫療","捲捲","旅行","家人","捐贈","保險","代購","其他"],
     transfer: ["帳戶互轉"]
   };
 
@@ -638,6 +638,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     { id:"card_lianbang", name:"聯邦信用卡", kind:"liability", group:"信用卡" },
     { id:"card_taishin", name:"台新信用卡", kind:"liability", group:"信用卡" },
     { id:"card_cathay", name:"國泰信用卡", kind:"liability", group:"信用卡" },
+    { id:"card_loan", name:"借貸", kind:"liability", group:"信用卡" },
     { id:"bank_taishin_salary", name:"台新薪轉", kind:"asset", group:"銀行帳戶" },
     { id:"bank_taishin_rich", name:"台新Rich", kind:"asset", group:"銀行帳戶" },
     { id:"bank_cathay_checking", name:"國泰活儲", kind:"asset", group:"銀行帳戶" },
@@ -847,7 +848,11 @@ enableIndexedDbPersistence(db).catch(() => {});
   const acctGroups = document.getElementById("acctGroups");
   const acctFilterSelect = document.getElementById("acctFilterSelect");
 
-  function fmt(n){ return Math.round(n).toLocaleString("zh-Hant"); }
+  const DECIMAL_CURRENCIES = { HKD: 2 };
+  function fmt(n, cur){
+    const decimals = DECIMAL_CURRENCIES[cur] || 0;
+    return Number(n).toLocaleString("zh-Hant", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  }
   function monthKey(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0"); }
   function localDateStr(d){
     d = d || new Date();
@@ -946,17 +951,17 @@ enableIndexedDbPersistence(db).catch(() => {});
   }
   function acctAmtHtml(kind, amt, cur){
     if(kind === "liability"){
-      return `<span class="a-amt liability">未繳 ${currencySymbol(cur)}${fmt(Math.abs(amt))}</span>`;
+      return `<span class="a-amt liability">未繳 ${currencySymbol(cur)}${fmt(Math.abs(amt), cur)}</span>`;
     }
     if(amt < -0.005){
-      return `<span class="a-amt warning">⚠ 餘額不足 -${currencySymbol(cur)}${fmt(Math.abs(amt))}</span>`;
+      return `<span class="a-amt warning">⚠ 餘額不足 -${currencySymbol(cur)}${fmt(Math.abs(amt), cur)}</span>`;
     }
-    return `<span class="a-amt asset">${currencySymbol(cur)}${fmt(amt)}</span>`;
+    return `<span class="a-amt asset">${currencySymbol(cur)}${fmt(amt, cur)}</span>`;
   }
   function acctAmtInline(kind, amt, cur){
-    if(kind === "liability") return `${cur} ${currencySymbol(cur)}${fmt(Math.abs(amt))}`;
-    if(amt < -0.005) return `<span class="warning-inline">⚠ ${cur} -${currencySymbol(cur)}${fmt(Math.abs(amt))}</span>`;
-    return `${cur} ${currencySymbol(cur)}${fmt(amt)}`;
+    if(kind === "liability") return `${cur} ${currencySymbol(cur)}${fmt(Math.abs(amt), cur)}`;
+    if(amt < -0.005) return `<span class="warning-inline">⚠ ${cur} -${currencySymbol(cur)}${fmt(Math.abs(amt), cur)}</span>`;
+    return `${cur} ${currencySymbol(cur)}${fmt(amt, cur)}`;
   }
 
   // ---------- Monthly history (collapsible) ----------
@@ -1150,8 +1155,8 @@ enableIndexedDbPersistence(db).catch(() => {});
     let html = "";
     currencies.forEach(cur => {
       const inc = fxIncome[cur] || 0, exp = fxExpense[cur] || 0, sym = currencySymbol(cur);
-      if(inc > 0) html += `<span class="fx-chip">${cur} 收入 <b>${sym}${fmt(inc)}</b></span>`;
-      if(exp > 0) html += `<span class="fx-chip">${cur} 支出 <b>${sym}${fmt(exp)}</b></span>`;
+      if(inc > 0) html += `<span class="fx-chip">${cur} 收入 <b>${sym}${fmt(inc, cur)}</b></span>`;
+      if(exp > 0) html += `<span class="fx-chip">${cur} 支出 <b>${sym}${fmt(exp, cur)}</b></span>`;
     });
     el.innerHTML = html;
   }
@@ -1213,8 +1218,8 @@ enableIndexedDbPersistence(db).catch(() => {});
 
         const isFxTransfer = t.type === "transfer" && typeof t.toAmount === "number" && (t.toCurrency || cur) !== cur;
         const amtHtml = isFxTransfer
-          ? `<div class="tx-amt" style="font-size:15px;">－${sym}${fmt(t.amount)}<br>＋${currencySymbol(t.toCurrency)}${fmt(t.toAmount)}</div>`
-          : `<div class="tx-amt">${sign} ${sym}${fmt(t.amount)}</div>`;
+          ? `<div class="tx-amt" style="font-size:15px;">－${sym}${fmt(t.amount, cur)}<br>＋${currencySymbol(t.toCurrency)}${fmt(t.toAmount, t.toCurrency)}</div>`
+          : `<div class="tx-amt">${sign} ${sym}${fmt(t.amount, cur)}</div>`;
 
         card.innerHTML = `
           <div class="tx-left">
@@ -1287,12 +1292,26 @@ enableIndexedDbPersistence(db).catch(() => {});
     });
   }
   [acctInput, fromAcctInput, toAcctInput].forEach(fillAccountSelect);
+
+  const ACCOUNT_DEFAULT_CURRENCY = { bank_hsbc_hk: "HKD" };
+  acctInput.addEventListener("change", () => {
+    const def = ACCOUNT_DEFAULT_CURRENCY[acctInput.value];
+    currencyInput.value = def || DEFAULT_CURRENCY;
+  });
   const fxFromAmount = document.getElementById("fxFromAmount");
   const fxToAmount = document.getElementById("fxToAmount");
   sanitizeNumericInput(fxFromAmount);
   sanitizeNumericInput(fxToAmount);
   const fxFromCurrency = document.getElementById("fxFromCurrency");
   const fxToCurrency = document.getElementById("fxToCurrency");
+  fromAcctInput.addEventListener("change", () => {
+    const def = ACCOUNT_DEFAULT_CURRENCY[fromAcctInput.value];
+    fxFromCurrency.value = def || DEFAULT_CURRENCY;
+  });
+  toAcctInput.addEventListener("change", () => {
+    const def = ACCOUNT_DEFAULT_CURRENCY[toAcctInput.value];
+    fxToCurrency.value = def || DEFAULT_CURRENCY;
+  });
   const fxAmountFields = document.getElementById("fxAmountFields");
   const amountField = document.getElementById("amountField");
   const currencyField = document.getElementById("currencyField");
@@ -1304,7 +1323,11 @@ enableIndexedDbPersistence(db).catch(() => {});
     const val = activeAmountInput ? activeAmountInput.value : "";
     if(/[+\-*/]/.test(val)){
       const result = evaluateExpr(val);
-      calcPreview.innerHTML = isNaN(result) ? "&nbsp;" : `= ${fmt(result)}`;
+      let cur = DEFAULT_CURRENCY;
+      if(activeAmountInput === fxFromAmount) cur = fxFromCurrency.value;
+      else if(activeAmountInput === fxToAmount) cur = fxToCurrency.value;
+      else if(activeAmountInput === amountInput) cur = currencyInput.value;
+      calcPreview.innerHTML = isNaN(result) ? "&nbsp;" : `= ${fmt(result, cur)}`;
     } else {
       calcPreview.innerHTML = "&nbsp;";
     }
