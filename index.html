@@ -1550,9 +1550,9 @@ enableIndexedDbPersistence(db).catch(() => {});
         }
         render();
         showToast(`已匯入 ${newOnes.length} 筆紀錄`);
-        if(currentUser && newOnes.length > 0){
+        if(currentUser && (newOnes.length > 0 || importedOpenings)){
           showToast(`正在同步到雲端…`);
-          await cloudBatchUpsert(newOnes);
+          if(newOnes.length > 0) await cloudBatchUpsert(newOnes);
           if(importedOpenings) await setDoc(doc(db, "users", currentUser.uid, "settings", "openings"), importedOpenings);
           showToast(`雲端同步完成`);
         }
