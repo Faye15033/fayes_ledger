@@ -389,6 +389,8 @@
       <button class="icon-btn" id="exportBtn" title="匯出備份">⇩</button>
       <button class="icon-btn" id="importBtn" title="匯入備份">⇧</button>
       <input type="file" id="importFile" accept="application/json">
+      <button class="icon-btn" id="undoImportBtn" title="還原批次匯入（刪除某個匯入檔案裡的所有紀錄）">↩</button>
+      <input type="file" id="undoImportFile" accept="application/json">
     </div>
   </header>
   <div class="title-row">
@@ -717,6 +719,15 @@ enableIndexedDbPersistence(db).catch(() => {});
       const chunk = txArray.slice(i, i+chunkSize);
       const batch = writeBatch(db);
       chunk.forEach(t => batch.set(doc(db, "users", currentUser.uid, "transactions", t.id), t));
+      await batch.commit();
+    }
+  }
+  async function cloudBatchDelete(ids){
+    const chunkSize = 400;
+    for(let i=0; i<ids.length; i+=chunkSize){
+      const chunk = ids.slice(i, i+chunkSize);
+      const batch = writeBatch(db);
+      chunk.forEach(id => batch.delete(doc(db, "users", currentUser.uid, "transactions", id)));
       await batch.commit();
     }
   }
@@ -1547,6 +1558,41 @@ enableIndexedDbPersistence(db).catch(() => {});
         }
       }catch(e){ showToast("檔案格式不正確"); }
       importFile.value = "";
+    };
+    reader.readAsText(file);
+  });
+
+  const undoImportFile = document.getElementById("undoImportFile");
+  document.getElementById("undoImportBtn").addEventListener("click", () => undoImportFile.click());
+  undoImportFile.addEventListener("change", () => {
+    const file = undoImportFile.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try{
+        const data = JSON.parse(reader.result);
+        const list = Array.isArray(data) ? data : (data.transactions || []);
+        if(!Array.isArray(list)) throw new Error("format");
+        const idsInFile = new Set(list.map(t => t && t.id).filter(Boolean));
+        const idsToDelete = transactions.filter(t => idsInFile.has(t.id)).map(t => t.id);
+        if(idsToDelete.length === 0){
+          showToast("這台裝置目前沒有符合這個檔案的紀錄可以刪除");
+          return;
+        }
+        const ok = confirm(`這個檔案裡有 ${idsInFile.size} 筆紀錄，目前記帳本裡符合的有 ${idsToDelete.length} 筆。確定要把這 ${idsToDelete.length} 筆從本機與雲端刪除嗎？此動作無法復原。`);
+        if(!ok) return;
+        const idSet = new Set(idsToDelete);
+        transactions = transactions.filter(t => !idSet.has(t.id));
+        saveTxLocal();
+        render();
+        showToast(`已刪除 ${idsToDelete.length} 筆`);
+        if(currentUser){
+          showToast("正在同步刪除到雲端…");
+          await cloudBatchDelete(idsToDelete);
+          showToast("雲端同步完成");
+        }
+      }catch(e){ showToast("檔案格式不正確"); }
+      undoImportFile.value = "";
     };
     reader.readAsText(file);
   });
