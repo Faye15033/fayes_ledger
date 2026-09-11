@@ -574,7 +574,7 @@
   <div class="modal">
     <button class="cancel-x" id="acctNamesClose">✕</button>
     <h2>帳戶名稱設定</h2>
-    <p class="sub">重新命名電子支付、信用卡、銀行帳戶的顯示名稱，改完會套用到所有紀錄裡。「現金」不開放改名。</p>
+    <p class="sub">重新命名電子支付、信用卡、銀行帳戶的顯示名稱，改完會套用到所有紀錄裡。「現金」不開放改名。這裡只能改名字，不提供新增或刪除帳戶，避免影響到歷史資料。</p>
     <div id="acctNamesGroups"></div>
     <button class="save-btn" id="acctNamesSave">儲 存</button>
     <button class="save-btn ghost" id="acctNamesCancel">取消</button>
@@ -719,6 +719,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     accountNames = newNames;
     saveAccountNamesLocal();
     applyAccountNames();
+    refreshAccountSelects();
     render();
     if(currentUser){
       try{ await setDoc(doc(db, "users", currentUser.uid, "settings", "accountNames"), accountNames); }
@@ -766,6 +767,7 @@ enableIndexedDbPersistence(db).catch(() => {});
       accountNames = snap.exists() ? snap.data() : {};
       saveAccountNamesLocal();
       applyAccountNames();
+      refreshAccountSelects();
       render();
     }, () => {});
   }
@@ -855,6 +857,7 @@ enableIndexedDbPersistence(db).catch(() => {});
       try{ openings = JSON.parse(localStorage.getItem(OPENING_KEY) || "{}"); }catch(e){ openings = {}; }
       try{ accountNames = JSON.parse(localStorage.getItem(ACCOUNT_NAMES_KEY) || "{}"); }catch(e){ accountNames = {}; }
       applyAccountNames();
+      refreshAccountSelects();
       render();
     }
   });
@@ -887,16 +890,22 @@ enableIndexedDbPersistence(db).catch(() => {});
   })();
 
   // ---------- Account filter dropdown ----------
-  ACCOUNT_GROUPS.forEach(group => {
-    const og = document.createElement("optgroup");
-    og.label = group;
-    ACCOUNTS.filter(a => a.group === group).forEach(a => {
-      const opt = document.createElement("option");
-      opt.value = a.id; opt.textContent = a.name;
-      og.appendChild(opt);
+  function fillAccountFilterSelect(){
+    const prevValue = acctFilterSelect.value;
+    acctFilterSelect.innerHTML = '<option value="">全部帳戶</option>';
+    ACCOUNT_GROUPS.forEach(group => {
+      const og = document.createElement("optgroup");
+      og.label = group;
+      ACCOUNTS.filter(a => a.group === group).forEach(a => {
+        const opt = document.createElement("option");
+        opt.value = a.id; opt.textContent = a.name;
+        og.appendChild(opt);
+      });
+      acctFilterSelect.appendChild(og);
     });
-    acctFilterSelect.appendChild(og);
-  });
+    acctFilterSelect.value = prevValue;
+  }
+  fillAccountFilterSelect();
   acctFilterSelect.addEventListener("change", () => { acctFilter = acctFilterSelect.value; render(); });
 
   // ---------- Balance computation (all-time, independent of month filter) ----------
@@ -1367,6 +1376,7 @@ enableIndexedDbPersistence(db).catch(() => {});
   });
 
   function fillAccountSelect(sel){
+    const prevValue = sel.value;
     sel.innerHTML = "";
     ACCOUNT_GROUPS.forEach(group => {
       const og = document.createElement("optgroup");
@@ -1378,8 +1388,13 @@ enableIndexedDbPersistence(db).catch(() => {});
       });
       sel.appendChild(og);
     });
+    if(prevValue) sel.value = prevValue;
   }
   [acctInput, fromAcctInput, toAcctInput].forEach(fillAccountSelect);
+  function refreshAccountSelects(){
+    [acctInput, fromAcctInput, toAcctInput].forEach(fillAccountSelect);
+    fillAccountFilterSelect();
+  }
   const fxFromAmount = document.getElementById("fxFromAmount");
   const fxToAmount = document.getElementById("fxToAmount");
   const fxFromCurrency = document.getElementById("fxFromCurrency");
@@ -1572,6 +1587,7 @@ enableIndexedDbPersistence(db).catch(() => {});
           accountNames = Object.assign({}, accountNames, data.accountNames);
           saveAccountNamesLocal();
           applyAccountNames();
+          refreshAccountSelects();
           importedAccountNames = accountNames;
         }
         render();
