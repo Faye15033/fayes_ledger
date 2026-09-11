@@ -58,6 +58,26 @@
 
   .wrap{ max-width: 720px; margin: 0 auto; padding: 40px 20px 120px; }
 
+  .auth-gate{
+    position:fixed; inset:0; z-index: 500; display:flex; align-items:center; justify-content:center;
+    background:
+      radial-gradient(1200px 600px at 10% -10%, #f4efe6 0%, transparent 60%),
+      radial-gradient(1000px 500px at 100% 0%, #eee6d8 0%, transparent 55%),
+      var(--bg);
+    padding: 24px;
+  }
+  .auth-gate-card{
+    background: var(--card); border-radius: 20px; box-shadow: var(--shadow);
+    padding: 36px 30px; text-align:center; max-width: 340px; width:100%;
+  }
+  .auth-gate-card h2{ font-family:"Noto Serif TC", serif; font-size:20px; margin: 0 0 10px; color: var(--ink); }
+  .auth-gate-card p{ font-size:13.5px; color: var(--ink-faint); line-height:1.7; margin: 0 0 22px; }
+  .auth-gate-btn{
+    background: var(--clay); color:#fff; border:none; border-radius: 12px; padding: 12px 22px;
+    font-size:14.5px; font-family:"Noto Sans TC",sans-serif; cursor:pointer; transition: all .15s ease;
+  }
+  .auth-gate-btn:hover{ background: var(--clay-deep); }
+
   /* ---------- Header ---------- */
   header.top{
     display:flex; align-items:flex-end; justify-content:space-between;
@@ -424,7 +444,21 @@
 </head>
 <body>
 
-<div class="wrap">
+<div id="authGate" class="auth-gate">
+  <div class="auth-gate-card">
+    <svg class="doodle" width="30" height="30" viewBox="0 0 32 32" fill="none" style="margin:0 auto 14px;display:block;">
+      <path d="M16 28 C16 20 16 14 16 6" stroke="var(--sage-deep)" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M16 13 C12 11 9 12 7 9" stroke="var(--sage)" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+      <path d="M16 18 C20 16 23 17 25 14" stroke="var(--sage)" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+      <circle cx="16" cy="6" r="2.1" fill="var(--gold)"/>
+    </svg>
+    <h2>Faye's 手帳</h2>
+    <p id="authGateMsg">請使用 Google 帳號登入以繼續</p>
+    <button id="authGateBtn" class="auth-gate-btn">使用 Google 登入</button>
+  </div>
+</div>
+
+<div class="wrap" id="appWrap" style="display:none;">
   <header class="top">
     <div class="brand-row">
       <svg class="doodle" width="24" height="24" viewBox="0 0 32 32" fill="none">
@@ -906,6 +940,25 @@ enableIndexedDbPersistence(db).catch(() => {});
     }
   }
 
+  const authGate = document.getElementById("authGate");
+  const authGateMsg = document.getElementById("authGateMsg");
+  const authGateBtn = document.getElementById("authGateBtn");
+  const appWrap = document.getElementById("appWrap");
+
+  function showGate(message, showButton){
+    appWrap.style.display = "none";
+    authGate.style.display = "flex";
+    authGateMsg.textContent = message;
+    authGateBtn.style.display = showButton ? "inline-block" : "none";
+  }
+  function hideGate(){
+    authGate.style.display = "none";
+    appWrap.style.display = "block";
+  }
+  authGateBtn.addEventListener("click", () => {
+    signInWithPopup(auth, googleProvider).catch(err => showToast("登入失敗：" + err.message));
+  });
+
   document.getElementById("manualSyncLink").addEventListener("click", async () => {
     if(!currentUser){ showToast("請先登入"); return; }
     if(transactions.length === 0){ showToast("這台裝置目前沒有本機資料可以同步"); return; }
@@ -943,31 +996,35 @@ enableIndexedDbPersistence(db).catch(() => {});
   onAuthStateChanged(auth, async (user) => {
     if(user && user.email !== ALLOWED_EMAIL){
       alert("這個帳本僅限特定 Google 帳號使用，這個帳號沒有存取權限，即將登出。");
+      currentUser = null;
       await signOut(auth);
       return;
     }
+    if(!user){
+      currentUser = null;
+      unsubscribeCloud();
+      showGate("請使用 Google 帳號登入以繼續使用這個帳本", true);
+      return;
+    }
     currentUser = user;
+    hideGate();
     updateCloudStatusUI();
-    if(user){
-      try{
-        const txCol = collection(db, "users", user.uid, "transactions");
-        const snap = await getDocs(txCol);
-        if(snap.empty && transactions.length > 0){
-          const ok = confirm(`偵測到這台裝置本機有 ${transactions.length} 筆尚未同步的紀錄，要上傳到雲端嗎？`);
-          if(ok){
-            await cloudBatchUpsert(transactions);
-            if(Object.keys(openings).length > 0){
-              await setDoc(doc(db, "users", user.uid, "settings", "openings"), openings);
-            }
+    try{
+      const txCol = collection(db, "users", user.uid, "transactions");
+      const snap = await getDocs(txCol);
+      if(snap.empty && transactions.length > 0){
+        const ok = confirm(`偵測到這台裝置本機有 ${transactions.length} 筆尚未同步的紀錄，要上傳到雲端嗎？`);
+        if(ok){
+          await cloudBatchUpsert(transactions);
+          if(Object.keys(openings).length > 0){
+            await setDoc(doc(db, "users", user.uid, "settings", "openings"), openings);
           }
         }
-      }catch(e){ showToast("雲端連線發生問題"); }
-      subscribeCloud(user.uid);
-    } else {
-      unsubscribeCloud();
-      try{ transactions = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }catch(e){ transactions = []; }
-      try{ openings = JSON.parse(localStorage.getItem(OPENING_KEY) || "{}"); }catch(e){ openings = {}; }
-      render();
+      }
+    }catch(e){ showToast("雲端連線發生問題"); }
+    subscribeCloud(user.uid);
+    if(!localStorage.getItem(ONBOARD_KEY)){
+      openOnboarding();
     }
   });
 
@@ -1899,10 +1956,6 @@ enableIndexedDbPersistence(db).catch(() => {});
   });
 
   document.getElementById("settingsBtn").addEventListener("click", openOnboarding);
-
-  if(!localStorage.getItem(ONBOARD_KEY)){
-    openOnboarding();
-  }
 
   // ---------- Version note: ask GitHub when this file was last committed ----------
   async function loadVersionDate(){
