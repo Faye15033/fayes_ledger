@@ -269,8 +269,23 @@
     text-align:center; color: var(--ink-faint); font-size:13px; font-style:italic; padding: 40px 10px;
     background: var(--card); border-radius:14px; box-shadow: var(--shadow);
   }
+  .trend-range-row{ display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+  .trend-range-row input[type="month"]{
+    flex:1; min-width:0; border:1px solid var(--line); background:#fff; border-radius:10px;
+    padding:8px 10px; font-size:16px; font-family:"Noto Sans TC",sans-serif; color: var(--ink);
+  }
+  .trend-range-row span{ color: var(--ink-faint); font-size:13px; }
+  .trend-fx-row{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  .trend-fx-item{
+    display:flex; align-items:center; gap:6px; background: var(--card); border-radius:10px;
+    padding:6px 10px; font-size:12.5px; color: var(--ink-soft); box-shadow: var(--shadow);
+  }
+  .trend-fx-item input{
+    width:64px; border:1px solid var(--line); border-radius:7px; padding:4px 6px;
+    font-size:16px; font-family:"Noto Sans TC",sans-serif; color: var(--ink); text-align:right;
+  }
   .trend-chart-card{ background: var(--card); border-radius:14px; padding:20px 16px 14px; box-shadow: var(--shadow); }
-  .trend-total{ text-align:center; font-size:12.5px; color: var(--ink-soft); margin-top:6px; letter-spacing:0.04em; }
+  .trend-total{ text-align:center; font-size:12.5px; color: var(--ink-soft); margin-top:6px; letter-spacing:0.04em; line-height:1.9; }
   .day-group{ margin-bottom: 18px; }
   .day-head{ display:flex; align-items:center; gap:10px; color: var(--ink-faint); font-size:13.5px; letter-spacing:0.08em; margin: 0 4px 8px; }
   .day-head .line{ flex:1; height:1px; background: repeating-linear-gradient(90deg, var(--line) 0 4px, transparent 4px 8px); }
@@ -546,6 +561,12 @@
         </div>
         <select id="trendCatSelect"></select>
       </div>
+      <div class="trend-range-row">
+        <input type="month" id="trendStartMonth">
+        <span>～</span>
+        <input type="month" id="trendEndMonth">
+      </div>
+      <div class="trend-fx-row" id="trendFxRow"></div>
       <div id="trendChartWrap"></div>
     </div>
   </div>
@@ -733,6 +754,18 @@ enableIndexedDbPersistence(db).catch(() => {});
     }
   }
 
+  const FX_RATES_KEY = "shiguang_ledger_fx_rates_v1";
+  let fxRates = {};
+  try{ fxRates = JSON.parse(localStorage.getItem(FX_RATES_KEY) || "{}"); }catch(e){ fxRates = {}; }
+  function saveFxRatesLocal(){ localStorage.setItem(FX_RATES_KEY, JSON.stringify(fxRates)); }
+  async function persistFxRates(){
+    saveFxRatesLocal();
+    if(currentUser){
+      try{ await setDoc(doc(db, "users", currentUser.uid, "settings", "fxRates"), fxRates); }
+      catch(e){ showToast("雲端同步失敗，稍後會自動重試"); }
+    }
+  }
+
   const CURRENCIES = {
     TWD: { symbol: "NT$", label: "台幣 TWD" },
     USD: { symbol: "US$", label: "美金 USD" },
@@ -804,6 +837,7 @@ enableIndexedDbPersistence(db).catch(() => {});
   let unsubOpenings = null;
   let unsubAccountNames = null;
   let unsubCategories = null;
+  let unsubFxRates = null;
 
   function upsertLocal(tx){
     const idx = transactions.findIndex(t => t.id === tx.id);
@@ -873,6 +907,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     if(unsubOpenings) unsubOpenings();
     if(unsubAccountNames) unsubAccountNames();
     if(unsubCategories) unsubCategories();
+    if(unsubFxRates) unsubFxRates();
     const txCol = collection(db, "users", uid, "transactions");
     unsubTx = onSnapshot(txCol, snap => {
       transactions = snap.docs.map(d => d.data());
@@ -906,12 +941,22 @@ enableIndexedDbPersistence(db).catch(() => {});
         if(typeof renderCatGrid === "function") renderCatGrid();
       }
     }, () => {});
+
+    const fxDoc = doc(db, "users", uid, "settings", "fxRates");
+    unsubFxRates = onSnapshot(fxDoc, snap => {
+      if(snap.exists()){
+        fxRates = snap.data();
+        saveFxRatesLocal();
+        if(typeof renderTrendChart === "function") renderTrendChart();
+      }
+    }, () => {});
   }
   function unsubscribeCloud(){
     if(unsubTx){ unsubTx(); unsubTx = null; }
     if(unsubOpenings){ unsubOpenings(); unsubOpenings = null; }
     if(unsubAccountNames){ unsubAccountNames(); unsubAccountNames = null; }
     if(unsubCategories){ unsubCategories(); unsubCategories = null; }
+    if(unsubFxRates){ unsubFxRates(); unsubFxRates = null; }
   }
 
   function updateCloudStatusUI(){
@@ -1222,6 +1267,9 @@ enableIndexedDbPersistence(db).catch(() => {});
   // ---------- Category trend ----------
   let trendType = "expense";
   const trendCatSelect = document.getElementById("trendCatSelect");
+  const trendStartMonth = document.getElementById("trendStartMonth");
+  const trendEndMonth = document.getElementById("trendEndMonth");
+  const trendFxRow = document.getElementById("trendFxRow");
   function fillTrendCatSelect(){
     trendCatSelect.innerHTML = "";
     CATS[trendType].forEach(cat => {
@@ -1237,30 +1285,97 @@ enableIndexedDbPersistence(db).catch(() => {});
       btn.classList.add("active");
       trendType = btn.dataset.type;
       fillTrendCatSelect();
+      trendStartMonth.value = ""; trendEndMonth.value = "";
       renderTrendChart();
     });
   });
-  trendCatSelect.addEventListener("change", renderTrendChart);
+  trendCatSelect.addEventListener("change", () => {
+    trendStartMonth.value = ""; trendEndMonth.value = "";
+    renderTrendChart();
+  });
+  trendStartMonth.addEventListener("change", renderTrendChart);
+  trendEndMonth.addEventListener("change", renderTrendChart);
+
+  function monthRangeKeys(startKey, endKey){
+    const keys = [];
+    let [y,m] = startKey.split("-").map(Number);
+    const [ey,em] = endKey.split("-").map(Number);
+    while(y < ey || (y === ey && m <= em)){
+      keys.push(y + "-" + String(m).padStart(2,"0"));
+      m++; if(m > 12){ m = 1; y++; }
+    }
+    return keys;
+  }
+
+  function renderFxRateInputs(currencies){
+    trendFxRow.innerHTML = "";
+    if(currencies.length === 0){ trendFxRow.style.display = "none"; return; }
+    trendFxRow.style.display = "flex";
+    currencies.forEach(cur => {
+      const item = document.createElement("label");
+      item.className = "trend-fx-item";
+      const label = document.createElement("span");
+      label.textContent = "1 " + (CURRENCIES[cur] ? CURRENCIES[cur].label : cur) + " =";
+      const input = document.createElement("input");
+      input.type = "text"; input.inputMode = "decimal"; input.autocomplete = "off";
+      input.value = (fxRates[cur] != null) ? fxRates[cur] : "";
+      input.placeholder = "匯率";
+      sanitizeNumericInput(input);
+      input.addEventListener("change", () => {
+        const v = parseFloat(input.value);
+        fxRates[cur] = isNaN(v) ? 0 : v;
+        persistFxRates();
+        renderTrendChart();
+      });
+      item.appendChild(label);
+      item.appendChild(input);
+      const suffix = document.createElement("span");
+      suffix.textContent = "台幣";
+      item.appendChild(suffix);
+      trendFxRow.appendChild(item);
+    });
+  }
 
   function renderTrendChart(){
     const wrap = document.getElementById("trendChartWrap");
     if(!wrap) return;
     const cat = trendCatSelect.value;
-    const byMonth = {};
-    transactions.forEach(t => {
-      if(t.type !== trendType) return;
-      if(t.category !== cat) return;
-      if(txCurrency(t) !== DEFAULT_CURRENCY) return;
-      const key = t.date.slice(0,7);
-      byMonth[key] = (byMonth[key] || 0) + t.amount;
-    });
-    const keys = Object.keys(byMonth).sort();
-    if(keys.length === 0){
-      wrap.innerHTML = `<div class="trend-empty">「${cat}」目前還沒有台幣紀錄可以畫趨勢圖</div>`;
+    const allTx = transactions.filter(t => t.type === trendType && t.category === cat);
+    const currencies = [...new Set(allTx.map(t => txCurrency(t)).filter(c => c !== DEFAULT_CURRENCY))].sort();
+    renderFxRateInputs(currencies);
+
+    if(allTx.length === 0){
+      wrap.innerHTML = `<div class="trend-empty">「${cat}」目前還沒有紀錄可以畫趨勢圖</div>`;
       return;
     }
-    const values = keys.map(k => byMonth[k]);
+    const allMonths = [...new Set(allTx.map(t => t.date.slice(0,7)))].sort();
+    if(!trendStartMonth.value) trendStartMonth.value = allMonths[0];
+    if(!trendEndMonth.value) trendEndMonth.value = allMonths[allMonths.length-1];
+    let startKey = trendStartMonth.value, endKey = trendEndMonth.value;
+    if(startKey > endKey){ [startKey, endKey] = [endKey, startKey]; }
+
+    const byMonth = {};
+    let hasUnsetRate = false;
+    allTx.forEach(t => {
+      const key = t.date.slice(0,7);
+      if(key < startKey || key > endKey) return;
+      const cur = txCurrency(t);
+      let rate = 1;
+      if(cur !== DEFAULT_CURRENCY){
+        rate = fxRates[cur];
+        if(rate == null || rate === 0){ hasUnsetRate = true; rate = rate || 0; }
+      }
+      byMonth[key] = (byMonth[key] || 0) + t.amount * rate;
+    });
+
+    const keys = monthRangeKeys(startKey, endKey);
+    if(keys.length === 0){
+      wrap.innerHTML = `<div class="trend-empty">選擇的期間內沒有資料</div>`;
+      return;
+    }
+    const values = keys.map(k => byMonth[k] || 0);
     const total = values.reduce((a,b) => a+b, 0);
+    const avg = total / keys.length;
     const max = Math.max(...values, 1);
     const W = 640, H = 220, padL = 44, padR = 20, padT = 20, padB = 32;
     const plotW = W - padL - padR, plotH = H - padT - padB;
@@ -1288,7 +1403,10 @@ enableIndexedDbPersistence(db).catch(() => {});
       `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.2" fill="${colorDeep}"><title>${p.key}：${fmt(p.v)}</title></circle>`
     ).join("");
 
+    const warn = hasUnsetRate ? `<div class="trend-empty" style="padding:10px; margin-bottom:10px; font-style:normal;">有幣別還沒設定匯率，暫以 0 計算，請在上面填入匯率</div>` : "";
+
     wrap.innerHTML = `
+      ${warn}
       <div class="trend-chart-card">
         <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">
           <line x1="${padL}" y1="${padT+plotH}" x2="${W-padR}" y2="${padT+plotH}" stroke="var(--line)" stroke-width="1"/>
@@ -1297,7 +1415,7 @@ enableIndexedDbPersistence(db).catch(() => {});
           ${dots}
           ${xLabels}
         </svg>
-        <div class="trend-total">${cat}累計 ${trendType==='income'?'收入':'支出'} NT$ ${fmt(total)}（近 ${keys.length} 個月）</div>
+        <div class="trend-total">${cat}期間合計 ${trendType==='income'?'收入':'支出'} NT$ ${fmt(total)}<br>月平均 NT$ ${fmt(avg)}（共 ${keys.length} 個月）</div>
       </div>
     `;
   }
