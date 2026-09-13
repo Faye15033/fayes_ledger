@@ -360,7 +360,8 @@
   .tx-card.income .tx-amt{ color: var(--sage-deep); }
   .tx-card.expense .tx-amt{ color: var(--clay-deep); }
   .tx-card.transfer .tx-amt{ color: var(--slate-deep); }
-  .tx-actions{ display:flex; align-items:center; gap:2px; }
+  .tx-actions{ display:none; align-items:center; gap:2px; }
+  .tx-card.selected .tx-actions{ display:flex; }
   .tx-edit{ background:none; border:none; color: var(--ink-faint); cursor:pointer; font-size:15px; padding: 4px 5px; transition: color .15s; }
   .tx-edit:hover{ color: var(--gold); }
   .tx-del{ background:none; border:none; color: var(--ink-faint); cursor:pointer; font-size:16px; padding: 4px 5px; transition: color .15s; }
@@ -1766,12 +1767,17 @@ enableIndexedDbPersistence(db).catch(() => {});
     });
     txList.querySelectorAll(".tx-card").forEach(card => {
       card.addEventListener("click", () => {
-        const t = transactions.find(t => t.id === card.dataset.id);
-        if(!t) return;
-        openEditModal(t);
+        const alreadySelected = card.classList.contains("selected");
+        txList.querySelectorAll(".tx-card.selected").forEach(c => c.classList.remove("selected"));
+        if(!alreadySelected) card.classList.add("selected");
       });
     });
   }
+  document.addEventListener("click", (e) => {
+    if(!e.target.closest(".tx-card")){
+      document.querySelectorAll(".tx-card.selected").forEach(c => c.classList.remove("selected"));
+    }
+  });
 
   document.getElementById("prevMonth").addEventListener("click", () => { current.setMonth(current.getMonth()-1); render(); });
   document.getElementById("nextMonth").addEventListener("click", () => { current.setMonth(current.getMonth()+1); render(); });
