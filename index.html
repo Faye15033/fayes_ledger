@@ -521,6 +521,7 @@
         <button class="icon-btn" id="backupMenuBtn" title="備份與還原">⇅</button>
         <div class="dropdown-menu" id="backupMenu">
           <button type="button" id="exportBtn">⇩ 匯出備份</button>
+          <button type="button" id="exportExcelBtn">⇩ 匯出 Excel</button>
           <button type="button" id="importBtn">⇧ 匯入備份</button>
           <button type="button" id="undoImportBtn">↩ 批次還原</button>
         </div>
@@ -841,6 +842,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import {
@@ -2541,6 +2543,57 @@ enableIndexedDbPersistence(db).catch(() => {});
     a.href = url; a.download = `Fayes手帳_備份_${stamp}.json`; a.click();
     URL.revokeObjectURL(url);
     showToast("已匯出備份");
+  });
+
+  document.getElementById("exportExcelBtn").addEventListener("click", () => {
+    if(typeof XLSX === "undefined"){ showToast("Excel 匯出功能載入失敗，請檢查網路連線"); return; }
+    const typeLabel = { income: "收入", expense: "支出", transfer: "轉帳" };
+    const rows = transactions.slice().sort((a,b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : 0)).map(t => {
+      const isTransfer = t.type === "transfer";
+      const isFx = isTransfer && typeof t.toAmount === "number" && (t.toCurrency || t.currency) !== t.currency;
+      let fromAcctName = "", fromAmt = "", fromCur = "";
+      let toAcctName = "", toAmt = "", toCur = "";
+      if(t.type === "expense"){
+        const a = getAccount(t.account);
+        fromAcctName = a ? a.name : "";
+        fromAmt = t.amount;
+        fromCur = t.currency || DEFAULT_CURRENCY;
+      } else if(t.type === "income"){
+        const a = getAccount(t.account);
+        toAcctName = a ? a.name : "";
+        toAmt = t.amount;
+        toCur = t.currency || DEFAULT_CURRENCY;
+      } else if(isTransfer){
+        const fromA = getAccount(t.fromAccount), toA = getAccount(t.toAccount);
+        fromAcctName = fromA ? fromA.name : "";
+        fromAmt = t.amount;
+        fromCur = t.currency || DEFAULT_CURRENCY;
+        toAcctName = toA ? toA.name : "";
+        toAmt = isFx ? t.toAmount : t.amount;
+        toCur = isFx ? (t.toCurrency || t.currency) : (t.currency || DEFAULT_CURRENCY);
+      }
+      return {
+        "日期": t.date,
+        "收入/支出/轉帳": typeLabel[t.type] || t.type,
+        "類型": isTransfer ? "帳戶互轉" : (t.category || ""),
+        "轉出帳戶": fromAcctName,
+        "轉出金額": fromAmt,
+        "轉出幣別": fromCur,
+        "轉入帳戶": toAcctName,
+        "轉入金額": toAmt,
+        "轉入幣別": toCur,
+        "備註": t.note || ""
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [
+      {wch:11},{wch:10},{wch:12},{wch:14},{wch:10},{wch:8},{wch:14},{wch:10},{wch:8},{wch:20}
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "帳本紀錄");
+    const stamp = localDateStr();
+    XLSX.writeFile(wb, `Fayes手帳_${stamp}.xlsx`);
+    showToast("已匯出 Excel");
   });
 
   const importFile = document.getElementById("importFile");
