@@ -446,13 +446,16 @@
   }
   .ob-row .ob-rm{ background:none; border:none; color: var(--ink-faint); cursor:pointer; font-size:15.5px; }
   .ob-add{ background:none; border:none; color: var(--gold); font-size:13.5px; cursor:pointer; padding:4px 0; }
-  .ob-acct-rm{ color: var(--ink-faint); cursor:pointer; font-size:14px; padding:2px 4px; flex-shrink:0; }
+  .ob-acct-rm{ color: var(--ink-faint); cursor:pointer; font-size:15.5px; padding:2px 4px; flex-shrink:0; }
   .ob-acct-rm:hover{ color: var(--clay-deep); }
   .ob-name-row .ob-acct-rm{ margin-left:auto; }
-  .ob-account.single-row{ padding: 10px 12px; }
-  .ob-single-row{ display:flex; align-items:center; gap:8px; }
-  .ob-single-row .ob-name-input{ flex: 1.6; min-width:0; margin-bottom:0; }
-  .ob-single-row .ob-amount-input{ flex: 1; min-width:0; }
+  .ob-single-row{ display:grid; grid-template-columns: 1.4fr 1fr auto; gap:8px; align-items:center; }
+  .ob-single-row .ob-name-input{ margin-bottom:0; }
+  .ob-single-row .ob-amount-input{
+    border: 1px solid var(--line); background:#fff; border-radius:8px; padding:8px 9px; font-size:16px;
+    font-family:"Noto Sans TC",sans-serif; color: var(--ink); min-width:0;
+  }
+  .ob-single-row .ob-acct-rm{ margin-left:0; }
   .ob-add-account{
     display:block; width:100%; background:none; border:1px dashed var(--line); color: var(--gold);
     font-size:13.5px; cursor:pointer; padding:8px 0; border-radius:10px; margin-top:4px;
