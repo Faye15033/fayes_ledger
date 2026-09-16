@@ -458,6 +458,14 @@
   }
   .cat-chip-editable .cat-rm:hover{ color: var(--clay-deep); }
   .cat-add-row{ display:flex; gap:8px; min-width:0; }
+  .exrate-box{ background: var(--card-soft); border-radius:12px; padding:12px 14px; margin-bottom:14px; }
+  .exrate-row{ display:flex; align-items:center; gap:8px; font-size:13.5px; color: var(--ink); margin-bottom:8px; }
+  .exrate-row:last-of-type{ margin-bottom:0; }
+  .exrate-input{
+    width:70px; border:1px solid var(--line); background:#fff; border-radius:8px;
+    padding:6px 8px; font-size:14px; text-align:right; color: var(--ink);
+  }
+  .exrate-note{ font-size:11.5px; color: var(--ink-faint); margin-top:10px; line-height:1.6; }
   .cat-add-row input{
     flex:1; border: 1px solid var(--line); background:#fff; border-radius:8px; padding:8px 10px;
     font-size:16px; font-family: var(--font-main); color: var(--ink);
@@ -563,6 +571,7 @@
       <button class="toggle-btn" id="monthlyHistoryBtn" type="button">+</button>
     </div>
     <div class="section-body" id="monthlyHistoryBody" style="display:none;">
+      <div id="exchangeRatesBox"></div>
       <div id="monthlyHistoryList"></div>
     </div>
   </div>
@@ -810,6 +819,22 @@ enableIndexedDbPersistence(db).catch(() => {});
   function currencySymbol(c){ return (CURRENCIES[c] || {symbol: c + " "}).symbol; }
   function txCurrency(t){ return t.currency || DEFAULT_CURRENCY; }
 
+  const EXCHANGE_RATES_KEY = "jeff_ledger_exchange_rates_v1";
+  let exchangeRates = {};
+  try{ exchangeRates = JSON.parse(localStorage.getItem(EXCHANGE_RATES_KEY) || "{}"); }catch(e){ exchangeRates = {}; }
+  function saveExchangeRatesLocal(){ localStorage.setItem(EXCHANGE_RATES_KEY, JSON.stringify(exchangeRates)); }
+  function getForeignCurrenciesInUse(){
+    const set = new Set();
+    transactions.forEach(t => { const c = txCurrency(t); if(c !== DEFAULT_CURRENCY) set.add(c); });
+    return Array.from(set).sort();
+  }
+  function convertedAmount(t){
+    const cur = txCurrency(t);
+    if(cur === DEFAULT_CURRENCY) return t.amount;
+    const rate = exchangeRates[cur];
+    return (rate && rate > 0) ? t.amount * rate : 0;
+  }
+
   const CUSTOM_ACCOUNTS_KEY = "jeff_ledger_custom_accounts_v1";
   let customAccounts = [];
   try{ customAccounts = JSON.parse(localStorage.getItem(CUSTOM_ACCOUNTS_KEY) || "[]"); }catch(e){ customAccounts = []; }
@@ -884,6 +909,7 @@ enableIndexedDbPersistence(db).catch(() => {});
   let unsubCustomAccounts = null;
   let unsubDeletedAccounts = null;
   let unsubDefaultCurrency = null;
+  let unsubExchangeRates = null;
 
   function upsertLocal(tx){
     const idx = transactions.findIndex(t => t.id === tx.id);
@@ -966,6 +992,15 @@ enableIndexedDbPersistence(db).catch(() => {});
     render();
     if(currentUser){
       try{ await setDoc(doc(db, "users", currentUser.uid, "settings", "defaultCurrency"), { code }); }
+      catch(e){ showToast("雲端同步失敗，稍後會自動重試"); }
+    }
+  }
+  async function persistExchangeRates(newRates){
+    exchangeRates = newRates;
+    saveExchangeRatesLocal();
+    render();
+    if(currentUser){
+      try{ await setDoc(doc(db, "users", currentUser.uid, "settings", "exchangeRates"), exchangeRates); }
       catch(e){ showToast("雲端同步失敗，稍後會自動重試"); }
     }
   }
@@ -1053,6 +1088,13 @@ enableIndexedDbPersistence(db).catch(() => {});
         render();
       }
     }, () => {});
+
+    const exRatesDoc = doc(db, "users", uid, "settings", "exchangeRates");
+    unsubExchangeRates = onSnapshot(exRatesDoc, snap => {
+      exchangeRates = snap.exists() ? snap.data() : {};
+      saveExchangeRatesLocal();
+      render();
+    }, () => {});
   }
   function unsubscribeCloud(){
     if(unsubTx){ unsubTx(); unsubTx = null; }
@@ -1062,6 +1104,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     if(unsubCustomAccounts){ unsubCustomAccounts(); unsubCustomAccounts = null; }
     if(unsubDeletedAccounts){ unsubDeletedAccounts(); unsubDeletedAccounts = null; }
     if(unsubDefaultCurrency){ unsubDefaultCurrency(); unsubDefaultCurrency = null; }
+    if(unsubExchangeRates){ unsubExchangeRates(); unsubExchangeRates = null; }
   }
 
   function updateCloudStatusUI(){
@@ -1172,6 +1215,7 @@ enableIndexedDbPersistence(db).catch(() => {});
         const savedCur = localStorage.getItem(DEFAULT_CURRENCY_KEY);
         if(savedCur && CURRENCIES[savedCur]) DEFAULT_CURRENCY = savedCur;
       }catch(e){}
+      try{ exchangeRates = JSON.parse(localStorage.getItem(EXCHANGE_RATES_KEY) || "{}"); }catch(e){ exchangeRates = {}; }
       rebuildAccounts();
       applyCurrencyDisplay();
       refreshAccountSelects();
@@ -1302,15 +1346,43 @@ enableIndexedDbPersistence(db).catch(() => {});
   }
 
   // ---------- Monthly history (collapsible) ----------
+  function renderExchangeRatesBox(){
+    const box = document.getElementById("exchangeRatesBox");
+    if(!box) return;
+    const foreign = getForeignCurrenciesInUse();
+    if(foreign.length === 0){ box.innerHTML = ""; return; }
+    let html = `<div class="exrate-box">`;
+    foreign.forEach(cur => {
+      const rate = exchangeRates[cur] || 0;
+      html += `<div class="exrate-row">
+        <span>1 ${cur} =</span>
+        <input type="text" inputmode="decimal" class="exrate-input" data-cur="${cur}" value="${rate === 0 ? '' : rate}" placeholder="0">
+        <span>${DEFAULT_CURRENCY}</span>
+      </div>`;
+    });
+    html += `<div class="exrate-note">此匯率是概算估值便於統計，非帳務實際匯率</div>`;
+    html += `</div>`;
+    box.innerHTML = html;
+    box.querySelectorAll(".exrate-input").forEach(input => {
+      input.addEventListener("change", () => {
+        const cur = input.dataset.cur;
+        const val = parseFloat(input.value) || 0;
+        const newRates = Object.assign({}, exchangeRates, { [cur]: val });
+        persistExchangeRates(newRates);
+      });
+    });
+  }
+
   function renderMonthlyHistory(){
+    renderExchangeRatesBox();
     const el = document.getElementById("monthlyHistoryList");
     const byMonth = {};
     transactions.forEach(t => {
-      if(txCurrency(t) !== DEFAULT_CURRENCY) return;
+      const amt = convertedAmount(t);
       const key = t.date.slice(0,7);
       if(!byMonth[key]) byMonth[key] = { income: 0, expense: 0 };
-      if(t.type === "income") byMonth[key].income += t.amount;
-      else if(t.type === "expense") byMonth[key].expense += t.amount;
+      if(t.type === "income") byMonth[key].income += amt;
+      else if(t.type === "expense") byMonth[key].expense += amt;
     });
     const keys = Object.keys(byMonth).sort().reverse();
     if(keys.length === 0){
@@ -1365,7 +1437,9 @@ enableIndexedDbPersistence(db).catch(() => {});
     const allOpt = document.createElement("option");
     allOpt.value = "__ALL__"; allOpt.textContent = "全部";
     trendCatSelect.appendChild(allOpt);
-    CATS[trendType].forEach(cat => {
+    const usedCats = new Set(transactions.filter(t => t.type === trendType).map(t => t.category));
+    const combined = CATS[trendType].concat(Array.from(usedCats).filter(c => !CATS[trendType].includes(c)));
+    combined.forEach(cat => {
       const opt = document.createElement("option");
       opt.value = cat; opt.textContent = cat;
       trendCatSelect.appendChild(opt);
@@ -1395,9 +1469,9 @@ enableIndexedDbPersistence(db).catch(() => {});
     transactions.forEach(t => {
       if(t.type !== trendType) return;
       if(cat !== "__ALL__" && t.category !== cat) return;
-      if(txCurrency(t) !== DEFAULT_CURRENCY) return;
+      const amt = convertedAmount(t);
       const key = t.date.slice(0,7);
-      byMonth[key] = (byMonth[key] || 0) + t.amount;
+      byMonth[key] = (byMonth[key] || 0) + amt;
     });
     return byMonth;
   }
@@ -1424,7 +1498,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     const byMonth = computeByMonth();
     let keys = Object.keys(byMonth).sort();
     if(keys.length === 0){
-      wrap.innerHTML = `<div class="trend-empty">「${cat}」目前還沒有${(CURRENCIES[DEFAULT_CURRENCY]?CURRENCIES[DEFAULT_CURRENCY].label.split(" ")[0]:DEFAULT_CURRENCY)}紀錄可以畫趨勢圖</div>`;
+      wrap.innerHTML = `<div class="trend-empty">「${cat}」目前還沒有紀錄可以畫趨勢圖</div>`;
       return;
     }
     if(!trendFromMonth.value || !trendToMonth.value) resetTrendRangeToFull();
@@ -1498,12 +1572,15 @@ enableIndexedDbPersistence(db).catch(() => {});
     const fxIncome = {}, fxExpense = {};
     monthTx.forEach(t => {
       const cur = txCurrency(t);
+      const amt = convertedAmount(t);
       if(t.type === "income"){
-        if(cur === DEFAULT_CURRENCY){ income += t.amount; incomeByCat[t.category] = (incomeByCat[t.category]||0) + t.amount; }
-        else { fxIncome[cur] = (fxIncome[cur]||0) + t.amount; }
+        income += amt;
+        if(cur === DEFAULT_CURRENCY) incomeByCat[t.category] = (incomeByCat[t.category]||0) + t.amount;
+        else fxIncome[cur] = (fxIncome[cur]||0) + t.amount;
       } else if(t.type === "expense"){
-        if(cur === DEFAULT_CURRENCY){ expense += t.amount; expenseByCat[t.category] = (expenseByCat[t.category]||0) + t.amount; }
-        else { fxExpense[cur] = (fxExpense[cur]||0) + t.amount; }
+        expense += amt;
+        if(cur === DEFAULT_CURRENCY) expenseByCat[t.category] = (expenseByCat[t.category]||0) + t.amount;
+        else fxExpense[cur] = (fxExpense[cur]||0) + t.amount;
       }
     });
 
