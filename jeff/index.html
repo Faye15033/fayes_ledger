@@ -2240,6 +2240,15 @@ enableIndexedDbPersistence(db).catch(() => {});
         if(SINGLE_CURRENCY_GROUPS.includes(group)){
           const existingAmt = (openings[a.id] && openings[a.id][DEFAULT_CURRENCY]) || 0;
           addObSingleRow(rowsEl, existingAmt);
+          const otherCurrencies = Object.keys(openings[a.id] || {}).filter(c => c !== DEFAULT_CURRENCY && (openings[a.id][c] || 0) !== 0);
+          if(otherCurrencies.length > 0){
+            const hint = document.createElement("div");
+            hint.className = "sub-small";
+            hint.style.margin = "4px 0 0";
+            hint.style.color = "var(--gold)";
+            hint.textContent = "另外還存有 " + otherCurrencies.map(c => currencySymbol(c) + " " + fmt(openings[a.id][c]) + " (" + c + ")").join("、") + "，是先前用別的預設幣別存的：資料還在、帳戶總覽也看得到，只是這裡目前只能編輯目前預設幣別（" + DEFAULT_CURRENCY + "）的金額，不會覆蓋掉它。";
+            box.appendChild(hint);
+          }
         } else {
           const addBtn = document.createElement("button");
           addBtn.type = "button"; addBtn.className = "ob-add"; addBtn.textContent = "＋ 新增幣別";
@@ -2398,12 +2407,20 @@ enableIndexedDbPersistence(db).catch(() => {});
     const newOpenings = {};
     settingsAcctGroups.querySelectorAll(".ob-account").forEach(box => {
       const acctId = box.dataset.acct;
+      const acctObj = getAccount(acctId);
       const map = {};
+      // Single-currency accounts (credit card / e-payment) only show ONE row for the
+      // current default currency. If the default currency was switched since a balance
+      // was last saved under the old currency, that old entry wouldn't be visible here --
+      // preserve it rather than silently deleting it.
+      if(acctObj && SINGLE_CURRENCY_GROUPS.includes(acctObj.group)){
+        Object.assign(map, openings[acctId] || {});
+      }
       box.querySelectorAll(".ob-row").forEach(row => {
         const selEl = row.querySelector("select");
         const cur = selEl ? selEl.value : (row.querySelector("input").dataset.singleCurrency || DEFAULT_CURRENCY);
         const val = parseFloat(row.querySelector("input").value) || 0;
-        if(val !== 0) map[cur] = (map[cur]||0) + val;
+        if(val !== 0) map[cur] = (selEl ? (map[cur]||0) : 0) + val; else delete map[cur];
       });
       if(Object.keys(map).length > 0) newOpenings[acctId] = map;
     });
