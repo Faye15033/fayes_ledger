@@ -11,6 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <style>
   :root{
+    --font-main: "Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif;
     --bg: #f3e6d2;
     --card: #fffaf1;
     --card-soft: #f8eeda;
@@ -41,6 +42,7 @@
   }
 
   *{ box-sizing: border-box; }
+  input, select, textarea, button{ font-family: inherit; }
 
   body{
     margin:0;
@@ -52,7 +54,7 @@
       var(--bg);
     background-repeat: repeat, no-repeat, no-repeat, no-repeat;
     color: var(--ink);
-    font-family: "Noto Sans TC", sans-serif;
+    font-family: var(--font-main);
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
   }
@@ -77,11 +79,11 @@
     width:88px; height:88px; border-radius:50%; object-fit:cover; display:block; margin:0 auto 16px;
     box-shadow: 0 0 0 3px #fff, 0 3px 10px rgba(90,70,50,0.2);
   }
-  .auth-gate-title{ font-family:'Noto Serif TC',serif; font-weight:700; font-size:23px; letter-spacing:0.08em; color: var(--gold); margin:0 0 10px; }
+  .auth-gate-title{ font-family: var(--font-main); font-weight:700; font-size:23px; letter-spacing:0.08em; color: var(--gold); margin:0 0 10px; }
   .auth-gate-msg{ font-size:14px; color: var(--ink-soft); line-height:1.7; margin:0 0 22px; }
   .auth-gate-btn{
     width:100%; background: var(--gold); color:#fff; border:none; border-radius:10px;
-    padding:13px 0; font-size:14.5px; font-family:"Noto Sans TC",sans-serif; font-weight:500;
+    padding:13px 0; font-size:14.5px; font-family: var(--font-main); font-weight:500;
     cursor:pointer; transition: all .2s ease;
   }
   .auth-gate-btn:hover{ opacity:0.9; transform: translateY(-1px); }
@@ -92,7 +94,7 @@
     display:flex; align-items:flex-end; justify-content:space-between;
     margin-bottom: 28px; padding-bottom: 18px; border-bottom: 1px solid var(--line);
   }
-  h1.title{ font-family:"Noto Sans TC",sans-serif; font-weight:700; font-size:29px; margin:-18px 0 24px; letter-spacing:0.08em; color: var(--gold); }
+  h1.title{ font-family: var(--font-main); font-weight:700; font-size:29px; margin:-18px 0 24px; letter-spacing:0.08em; color: var(--gold); }
   .top-actions{ display:flex; gap: 10px; }
   .icon-btn{
     width:40px; height:40px; border-radius:50%; border:1px solid var(--line);
@@ -117,7 +119,7 @@
   .file-menu.open{ display:flex; }
   .file-menu button{
     background:none; border:none; text-align:left; padding:9px 10px; border-radius:8px;
-    font-size:13.5px; color: var(--ink); cursor:pointer; font-family:"Noto Sans TC",sans-serif;
+    font-size:13.5px; color: var(--ink); cursor:pointer; font-family: var(--font-main);
   }
   .file-menu button:hover{ background: var(--card-soft); color: var(--gold); }
 
@@ -146,10 +148,10 @@
     cursor:pointer; padding:6px 10px; transition: color .2s;
   }
   .month-nav button:hover{ color: var(--gold); }
-  .month-label{ font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif; font-size:21.5px; font-weight:600; letter-spacing:0.12em; min-width: 140px; text-align:center; color: var(--slate-deep); }
+  .month-label{ font-family: var(--font-main); font-size:21.5px; font-weight:600; letter-spacing:0.12em; min-width: 140px; text-align:center; color: var(--slate-deep); }
   .acct-filter select{
     border: 1px solid var(--line); background: var(--card); border-radius: 10px;
-    padding: 7px 10px; font-size: 14px; color: var(--ink-soft); font-family:"Noto Sans TC",sans-serif;
+    padding: 7px 10px; font-size: 14px; color: var(--ink-soft); font-family: var(--font-main);
   }
 
   /* ---------- Summary ---------- */
@@ -157,7 +159,7 @@
   .sum-card{ background: var(--card); border-radius: 14px; padding: 18px 16px; box-shadow: 0 0 0 3px #fff, var(--shadow); position:relative; overflow:hidden; }
   .sum-card .label{ font-size:13.5px; letter-spacing:0.15em; color: var(--ink-soft); margin-bottom:8px; }
   .sum-card .num{
-    font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif;
+    font-family: var(--font-main);
     font-size: clamp(17px, 5.6vw, 26px); font-weight:700; line-height:1.2;
     white-space:nowrap; overflow:visible;
   }
@@ -181,7 +183,7 @@
   .fx-chip b{ color: var(--ink); font-weight:500; }
 
   /* ---------- Accounts overview ---------- */
-  .accounts-title{ font-family:"Noto Sans TC", sans-serif; font-size:15.5px; letter-spacing:0.12em; color: var(--ink-soft); margin: 6px 4px 12px; display:flex; justify-content:space-between; align-items:center; }
+  .accounts-title{ font-family: var(--font-main); font-size:15.5px; letter-spacing:0.12em; color: var(--ink-soft); margin: 6px 4px 12px; display:flex; justify-content:space-between; align-items:center; }
   .accounts-title > span{ display:inline-flex; align-items:center; gap:10px; }
   .accounts-title .edit-link{ font-size:13px; color: var(--gold); cursor:pointer; letter-spacing:0.03em; }
   .acct-groups{ display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 30px; }
@@ -191,7 +193,7 @@
   .acct-line{ display:flex; justify-content:space-between; align-items:baseline; padding: 5px 0; font-size:14.5px; border-bottom: 1px dashed var(--line); }
   .acct-line:last-child{ border-bottom:none; }
   .acct-line .a-name{ color: var(--ink); }
-  .acct-line .a-amt{ font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif; font-weight:700; font-size:16.5px; }
+  .acct-line .a-amt{ font-family: var(--font-main); font-weight:700; font-size:16.5px; }
   .acct-line .a-amt.asset{ color: var(--sage-deep); }
   .acct-line .a-amt.liability{ color: var(--clay-deep); }
   .acct-line .a-amt.warning{ color: var(--clay-deep); background: var(--clay-soft); padding:2px 8px; border-radius:8px; font-size:14px; }
@@ -203,7 +205,7 @@
   .bd-card{ background: var(--card); border-radius: 14px; padding: 18px 18px 12px; box-shadow: var(--shadow); }
   .bd-card.income{ background: var(--sage-soft); }
   .bd-card.expense{ background: var(--clay-soft); }
-  .bd-card h3{ font-family:"Noto Sans TC",sans-serif; font-size:15.5px; font-weight:600; letter-spacing:0.1em; margin: 0 0 12px; display:flex; align-items:center; gap:6px; }
+  .bd-card h3{ font-family: var(--font-main); font-size:15.5px; font-weight:600; letter-spacing:0.1em; margin: 0 0 12px; display:flex; align-items:center; gap:6px; }
   .bd-card h3 .dot{ width:7px; height:7px; border-radius:50%; display:inline-block; }
   .bd-card.income h3{ color: var(--sage-deep); }
   .bd-card.income h3 .dot{ background: var(--sage); }
@@ -219,11 +221,11 @@
   .bd-empty{ color: var(--ink-faint); font-size:14px; padding: 10px 0; font-style: italic; }
 
   /* ---------- Transaction list ---------- */
-  .list-title{ font-family:"Noto Sans TC", sans-serif; font-size:15.5px; letter-spacing:0.12em; color: var(--ink-soft); margin: 6px 4px 12px; display:flex; align-items:center; gap:10px; }
+  .list-title{ font-family: var(--font-main); font-size:15.5px; letter-spacing:0.12em; color: var(--ink-soft); margin: 6px 4px 12px; display:flex; align-items:center; gap:10px; }
 
   /* ---------- New: section cards (monthly history / category trend) ---------- */
   .section-card{ margin: 30px 0; }
-  .section-title{ font-family:"Noto Sans TC", sans-serif; font-size:15.5px; letter-spacing:0.12em; color: var(--ink-soft); display:inline-flex; align-items:center; gap:10px; }
+  .section-title{ font-family: var(--font-main); font-size:15.5px; letter-spacing:0.12em; color: var(--ink-soft); display:inline-flex; align-items:center; gap:10px; }
   .section-icon{
     width:52px; height:52px; border-radius:50%; object-fit:cover; flex-shrink:0;
     box-shadow: 0 0 0 2px #fff, 0 2px 8px rgba(90,70,50,0.18);
@@ -246,13 +248,13 @@
     background: var(--card); border-radius: 12px; padding: 12px 16px; margin-bottom: 8px;
     box-shadow: 0 2px 8px rgba(74,67,57,0.05);
   }
-  .mh-row .mh-month{ font-family:"Noto Serif TC", serif; font-size:14px; letter-spacing:0.06em; }
-  .mh-row .mh-nums{ display:flex; gap:16px; font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif; font-weight:700; font-size:14px; }
+  .mh-row .mh-month{ font-family: var(--font-main); font-size:14px; letter-spacing:0.06em; }
+  .mh-row .mh-nums{ display:flex; gap:16px; font-family: var(--font-main); font-weight:700; font-size:14px; }
   .mh-row .mh-in{ color: var(--sage-deep); }
   .mh-row .mh-out{ color: var(--clay-deep); }
   .mh-row .mh-bal{ color: var(--gold); }
   .mh-row.mh-header{ background:none; box-shadow:none; padding: 4px 16px; margin-bottom:2px; }
-  .mh-row.mh-header .mh-month{ color: var(--ink-faint); font-size:11.5px; letter-spacing:0.08em; font-family:"Noto Sans TC",sans-serif; }
+  .mh-row.mh-header .mh-month{ color: var(--ink-faint); font-size:11.5px; letter-spacing:0.08em; font-family: var(--font-main); }
   .mh-row.mh-header .mh-nums span{ color: var(--ink-faint) !important; font-size:11.5px; font-weight:500; letter-spacing:0.05em; }
   .mh-row .mh-nums{ min-width: 210px; justify-content:space-between; }
   .mh-row .mh-nums span{ min-width: 60px; text-align:right; }
@@ -262,12 +264,12 @@
   .trend-controls .type-tabs{ width: 160px; margin-bottom:0; }
   .trend-controls select{
     flex:1; min-width:140px; border:1px solid var(--line); background:#fff; border-radius:10px;
-    padding:9px 12px; font-size:13.5px; font-family:"Noto Sans TC",sans-serif; color: var(--ink);
+    padding:9px 12px; font-size:13.5px; font-family: var(--font-main); color: var(--ink);
   }
   .trend-range-row{ display:flex; align-items:center; gap:8px; margin-bottom:18px; flex-wrap:wrap; font-size:13px; color: var(--ink-soft); }
   .trend-range-row input[type="month"]{
     border:1px solid var(--line); background:#fff; border-radius:8px; padding:7px 9px;
-    font-size:16px; font-family:"Noto Sans TC",sans-serif; color: var(--ink);
+    font-size:16px; font-family: var(--font-main); color: var(--ink);
   }
   .trend-range-row button{
     background: var(--card-soft); color: var(--ink-soft); border:1px solid var(--line); border-radius:8px;
@@ -312,7 +314,7 @@
   .tx-card.transfer .tx-tag{ background: var(--slate-soft); color: var(--slate-deep); }
 
   .tx-right{ display:flex; align-items:center; gap:10px; }
-  .tx-amt{ font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif; font-size:20.5px; font-weight:700; }
+  .tx-amt{ font-family: var(--font-main); font-size:20.5px; font-weight:700; }
   .tx-card.income .tx-amt{ color: var(--sage-deep); }
   .tx-card.expense .tx-amt{ color: var(--clay-deep); }
   .tx-card.transfer .tx-amt{ color: var(--slate-deep); }
@@ -325,7 +327,7 @@
   .tx-del:hover{ color: var(--clay-deep); }
 
   .empty-state{ text-align:center; padding: 50px 20px; color: var(--ink-faint); }
-  .empty-state .mark{ font-family:"Cormorant Garamond", serif; font-style:italic; font-size:24.5px; display:block; margin-bottom:8px; }
+  .empty-state .mark{ font-family: var(--font-main); font-style:italic; font-size:24.5px; display:block; margin-bottom:8px; }
 
   /* ---------- Floating add button ---------- */
   .fab{
@@ -353,7 +355,7 @@
   @media (min-width: 640px){ .modal{ border-radius: 20px; } }
   @keyframes slideUp{ from{ transform: translateY(24px); opacity:0;} to{ transform:none; opacity:1;} }
 
-  .modal h2{ font-family:"Noto Serif TC", serif; font-size:20px; letter-spacing:0.1em; margin: 0 0 18px; text-align:center; }
+  .modal h2{ font-family: var(--font-main); font-size:20px; letter-spacing:0.1em; margin: 0 0 18px; text-align:center; }
   .modal p.sub{ font-size:13.5px; color: var(--ink-faint); text-align:center; margin:-12px 0 18px; line-height:1.7; }
 
   .type-tabs{ display:flex; background: var(--card-soft); border-radius: 12px; padding: 4px; margin-bottom: 18px; }
@@ -371,7 +373,7 @@
   .field label{ display:block; font-size:13px; letter-spacing:0.1em; color: var(--ink-soft); margin-bottom: 7px; }
   .field input[type="number"], .field input[type="date"], .field input[type="text"], .field select{
     width:100%; border: 1px solid var(--line); background: #fff; border-radius: 10px;
-    padding: 11px 13px; font-size: 16px; font-family: "Noto Sans TC", sans-serif; color: var(--ink);
+    padding: 11px 13px; font-size: 16px; font-family: var(--font-main); color: var(--ink);
     outline:none; transition: border-color .2s;
   }
   .field input:focus, .field select:focus{ border-color: var(--gold); }
@@ -404,7 +406,7 @@
 
   .save-btn{
     width:100%; padding: 13px; border:none; border-radius: 12px; background: var(--ink); color: var(--bg);
-    font-size:16px; letter-spacing:0.15em; font-family:"Noto Serif TC", serif; cursor:pointer;
+    font-size:16px; letter-spacing:0.15em; font-family: var(--font-main); cursor:pointer;
     margin-top: 6px; transition: opacity .2s;
   }
   .save-btn:hover{ opacity:0.85; }
@@ -427,20 +429,21 @@
   .ob-account{ background: var(--card-soft); border-radius: 12px; padding: 12px 12px 6px; margin-bottom:10px; }
   .ob-account .ob-name{ font-size:15px; font-weight:500; margin-bottom:8px; }
   .ob-row{ display:grid; grid-template-columns: 1fr 1fr auto; gap:8px; margin-bottom:8px; align-items:center; min-width:0; }
+  .ob-row.ob-row-single{ grid-template-columns: 1fr; }
   .ob-row > *{ min-width:0; }
   .ob-row select, .ob-row input{
     border: 1px solid var(--line); background:#fff; border-radius:8px; padding:8px 9px; font-size:16px;
-    font-family:"Noto Sans TC",sans-serif; color: var(--ink);
+    font-family: var(--font-main); color: var(--ink);
   }
   .ob-row .ob-rm{ background:none; border:none; color: var(--ink-faint); cursor:pointer; font-size:15.5px; }
   .ob-add{ background:none; border:none; color: var(--gold); font-size:13.5px; cursor:pointer; padding:4px 0; }
   .name-edit-input{
     width:100%; box-sizing:border-box; border: 1px solid var(--line); background:#fff; border-radius:8px;
-    padding:9px 10px; font-size:16px; font-family:"Noto Sans TC",sans-serif; color: var(--ink); margin-bottom:8px;
+    padding:9px 10px; font-size:16px; font-family: var(--font-main); color: var(--ink); margin-bottom:8px;
   }
   .settings-section{ margin-bottom: 22px; padding-bottom:18px; border-bottom: 1px solid var(--line); }
   .settings-section:last-of-type{ border-bottom:none; padding-bottom:0; }
-  .settings-h3{ font-family:"Noto Serif TC",serif; font-size:16px; color: var(--gold); margin:0 0 4px; letter-spacing:0.06em; }
+  .settings-h3{ font-family: var(--font-main); font-size:16px; color: var(--gold); margin:0 0 4px; letter-spacing:0.06em; }
   .sub-small{ font-size:12.5px; color: var(--ink-faint); line-height:1.6; margin: 0 0 12px; }
   .cat-manage-group{ margin-bottom:14px; }
   .cat-manage-group h4{ font-size:13px; letter-spacing:0.12em; color: var(--ink-faint); margin: 0 0 8px; }
@@ -457,7 +460,7 @@
   .cat-add-row{ display:flex; gap:8px; min-width:0; }
   .cat-add-row input{
     flex:1; border: 1px solid var(--line); background:#fff; border-radius:8px; padding:8px 10px;
-    font-size:16px; font-family:"Noto Sans TC",sans-serif; color: var(--ink);
+    font-size:16px; font-family: var(--font-main); color: var(--ink);
   }
   .cat-add-row button{
     background: var(--gold-soft); color: var(--gold); border:none; border-radius:8px; padding:0 16px;
@@ -474,6 +477,22 @@
   .tab-icon{ display:inline-block; vertical-align:-4px; margin-right:5px; }
   .group-icon{ display:inline-block; vertical-align:-4px; margin-right:6px; opacity:0.75; }
   .ob-header-illustration{ display:block; margin: -4px auto 6px; }
+  /* ---------- Larger text specifically inside the Account Settings modal ---------- */
+  #obOverlay .modal h2{ font-size:23px; }
+  #obOverlay p.sub{ font-size:15px; line-height:1.8; }
+  #obOverlay .settings-h3{ font-size:18px; }
+  #obOverlay .sub-small{ font-size:14px; line-height:1.7; }
+  #obOverlay .ob-group h4{ font-size:15px; }
+  #obOverlay .cat-manage-group h4{ font-size:15px; }
+  #obOverlay .ob-account .ob-name{ font-size:17px; }
+  #obOverlay .name-edit-input{ font-size:17px; padding:11px 12px; }
+  #obOverlay .ob-row select, #obOverlay .ob-row input{ font-size:17px; padding:10px 11px; }
+  #obOverlay .cat-chip-editable{ font-size:15px; padding:7px 7px 7px 15px; }
+  #obOverlay .cat-add-row input{ font-size:17px; }
+  #obOverlay .cat-add-row button{ font-size:14.5px; }
+  #obOverlay .ob-add{ font-size:14.5px; }
+  #obOverlay .save-btn{ font-size:17px; }
+  #obOverlay #defaultCurrencySelect{ font-size:17px; }
 </style>
 </head>
 <body>
@@ -566,7 +585,6 @@
         <input type="month" id="trendFromMonth">
         <span>～</span>
         <input type="month" id="trendToMonth">
-        <button type="button" id="trendRangeReset">顯示全部</button>
       </div>
       <div id="trendChartWrap"></div>
     </div>
@@ -702,7 +720,7 @@
 
     <div class="settings-section">
       <h3 class="settings-h3">收支分類</h3>
-      <p class="sub-small">可以新增分類，或刪除不需要的分類；刪除分類不會影響已經記過的舊紀錄。</p>
+      <p class="sub-small">刪除分類雖不影響歷史紀錄，但長期會影響細項趨勢，不建議頻繁增刪。</p>
       <div id="settingsCatGroups"></div>
     </div>
 
@@ -1329,9 +1347,13 @@ enableIndexedDbPersistence(db).catch(() => {});
   const trendBtn = document.getElementById("trendBtn");
   const trendBody = document.getElementById("trendBody");
   function toggleTrendSection(){
-    const open = trendBody.style.display !== "none";
-    trendBody.style.display = open ? "none" : "block";
-    trendBtn.classList.toggle("open", !open);
+    const wasOpen = trendBody.style.display !== "none";
+    trendBody.style.display = wasOpen ? "none" : "block";
+    trendBtn.classList.toggle("open", !wasOpen);
+    if(!wasOpen){
+      resetTrendRangeToFull();
+      renderTrendChart();
+    }
   }
   document.getElementById("trendToggle").addEventListener("click", toggleTrendSection);
 
@@ -1340,6 +1362,9 @@ enableIndexedDbPersistence(db).catch(() => {});
   const trendCatSelect = document.getElementById("trendCatSelect");
   function fillTrendCatSelect(){
     trendCatSelect.innerHTML = "";
+    const allOpt = document.createElement("option");
+    allOpt.value = "__ALL__"; allOpt.textContent = "全部";
+    trendCatSelect.appendChild(allOpt);
     CATS[trendType].forEach(cat => {
       const opt = document.createElement("option");
       opt.value = cat; opt.textContent = cat;
@@ -1363,14 +1388,13 @@ enableIndexedDbPersistence(db).catch(() => {});
   const trendToMonth = document.getElementById("trendToMonth");
   trendFromMonth.addEventListener("change", renderTrendChart);
   trendToMonth.addEventListener("change", renderTrendChart);
-  document.getElementById("trendRangeReset").addEventListener("click", () => { resetTrendRangeToFull(); renderTrendChart(); });
 
   function computeByMonth(){
     const cat = trendCatSelect.value;
     const byMonth = {};
     transactions.forEach(t => {
       if(t.type !== trendType) return;
-      if(t.category !== cat) return;
+      if(cat !== "__ALL__" && t.category !== cat) return;
       if(txCurrency(t) !== DEFAULT_CURRENCY) return;
       const key = t.date.slice(0,7);
       byMonth[key] = (byMonth[key] || 0) + t.amount;
@@ -1395,7 +1419,8 @@ enableIndexedDbPersistence(db).catch(() => {});
   function renderTrendChart(){
     const wrap = document.getElementById("trendChartWrap");
     if(!wrap) return;
-    const cat = trendCatSelect.value;
+    const catRaw = trendCatSelect.value;
+    const cat = catRaw === "__ALL__" ? "全部" : catRaw;
     const byMonth = computeByMonth();
     let keys = Object.keys(byMonth).sort();
     if(keys.length === 0){
@@ -2160,6 +2185,8 @@ enableIndexedDbPersistence(db).catch(() => {});
     showToast("已刪除帳戶");
   }
 
+  const SINGLE_CURRENCY_GROUPS = ["電子支付","信用卡"];
+
   function renderAcctGroups(){
     settingsAcctGroups.innerHTML = "";
     ACCOUNT_GROUPS.forEach(group => {
@@ -2183,15 +2210,15 @@ enableIndexedDbPersistence(db).catch(() => {});
           nameInput.value = a.name;
           nameInput.dataset.acct = a.id;
           nameRow.appendChild(nameInput);
-          if(!isAccountUsedInHistory(a.id)){
-            const delBtn = document.createElement("button");
-            delBtn.type = "button";
-            delBtn.className = "ob-rm";
-            delBtn.title = "刪除這個帳戶（目前沒有使用紀錄）";
-            delBtn.textContent = "✕";
-            delBtn.addEventListener("click", () => deleteAccount(a));
-            nameRow.appendChild(delBtn);
-          }
+          const delBtn = document.createElement("button");
+          delBtn.type = "button";
+          delBtn.className = "ob-rm";
+          const deletable = !isAccountUsedInHistory(a.id);
+          delBtn.title = deletable ? "刪除這個帳戶（目前沒有使用紀錄）" : "這個帳戶已有使用紀錄，無法刪除";
+          delBtn.textContent = deletable ? "❌" : "🚫";
+          if(!deletable) delBtn.style.opacity = "0.55";
+          delBtn.addEventListener("click", () => deleteAccount(a));
+          nameRow.appendChild(delBtn);
           nameRow.style.marginBottom = "8px";
           box.appendChild(nameRow);
         } else {
@@ -2210,14 +2237,19 @@ enableIndexedDbPersistence(db).catch(() => {});
         const rowsEl = document.createElement("div");
         rowsEl.className = "ob-rows";
         box.appendChild(rowsEl);
-        const addBtn = document.createElement("button");
-        addBtn.type = "button"; addBtn.className = "ob-add"; addBtn.textContent = "＋ 新增幣別";
-        addBtn.addEventListener("click", () => addObRow(rowsEl, DEFAULT_CURRENCY, 0));
-        box.appendChild(addBtn);
-        const existing = openings[a.id] || {};
-        const entries = Object.entries(existing);
-        if(entries.length === 0) entries.push([DEFAULT_CURRENCY, 0]);
-        entries.forEach(([cur, amt]) => addObRow(rowsEl, cur, amt));
+        if(SINGLE_CURRENCY_GROUPS.includes(group)){
+          const existingAmt = (openings[a.id] && openings[a.id][DEFAULT_CURRENCY]) || 0;
+          addObSingleRow(rowsEl, existingAmt);
+        } else {
+          const addBtn = document.createElement("button");
+          addBtn.type = "button"; addBtn.className = "ob-add"; addBtn.textContent = "＋ 新增幣別";
+          addBtn.addEventListener("click", () => addObRow(rowsEl, DEFAULT_CURRENCY, 0));
+          box.appendChild(addBtn);
+          const existing = openings[a.id] || {};
+          const entries = Object.entries(existing);
+          if(entries.length === 0) entries.push([DEFAULT_CURRENCY, 0]);
+          entries.forEach(([cur, amt]) => addObRow(rowsEl, cur, amt));
+        }
         wrap.appendChild(box);
       });
       if(group !== "現金"){
@@ -2306,6 +2338,8 @@ enableIndexedDbPersistence(db).catch(() => {});
     renderSettingsCategories();
     renderDefaultCurrencySelect();
     obOverlay.classList.add("open");
+    const modalEl = obOverlay.querySelector(".modal");
+    if(modalEl) modalEl.scrollTop = 0;
   }
   function addObRow(rowsEl, cur, amt){
     const row = document.createElement("div");
@@ -2323,6 +2357,15 @@ enableIndexedDbPersistence(db).catch(() => {});
     rm.type = "button"; rm.className = "ob-rm"; rm.textContent = "✕";
     rm.addEventListener("click", () => row.remove());
     row.appendChild(sel); row.appendChild(input); row.appendChild(rm);
+    rowsEl.appendChild(row);
+  }
+  function addObSingleRow(rowsEl, amt){
+    const row = document.createElement("div");
+    row.className = "ob-row ob-row-single";
+    const input = document.createElement("input");
+    input.type = "text"; input.inputMode = "decimal"; input.autocomplete = "off"; input.value = amt;
+    input.dataset.singleCurrency = DEFAULT_CURRENCY;
+    row.appendChild(input);
     rowsEl.appendChild(row);
   }
   function closeOnboarding(){ obOverlay.classList.remove("open"); localStorage.setItem(ONBOARD_KEY, "1"); }
@@ -2357,7 +2400,8 @@ enableIndexedDbPersistence(db).catch(() => {});
       const acctId = box.dataset.acct;
       const map = {};
       box.querySelectorAll(".ob-row").forEach(row => {
-        const cur = row.querySelector("select").value;
+        const selEl = row.querySelector("select");
+        const cur = selEl ? selEl.value : (row.querySelector("input").dataset.singleCurrency || DEFAULT_CURRENCY);
         const val = parseFloat(row.querySelector("input").value) || 0;
         if(val !== 0) map[cur] = (map[cur]||0) + val;
       });
