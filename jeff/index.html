@@ -754,7 +754,7 @@
 
     <div class="settings-section">
       <h3 class="settings-h3">帳戶與起始餘額</h3>
-      <p class="sub-small">「現金」不開放改名。電子支付、信用卡、銀行帳戶可以重新命名；已建立的帳戶不提供刪除，避免影響到歷史資料，但可以在下面新增新的帳戶（例如之後開了新的銀行戶頭）。餘額請填目前的實際餘額（信用卡請填目前未繳金額）。</p>
+      <p class="sub-small">已建立的帳戶不能刪，避免影響到歷史資料，但可以新增。餘額請填目前的實際餘額（信用卡請填目前未繳金額）。</p>
       <div id="settingsAcctGroups"></div>
     </div>
 
@@ -890,7 +890,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     { id:"bank_hangseng", name:"恒生銀行", kind:"asset", group:"銀行帳戶" }
   ];
   const ACCOUNT_GROUPS = ["現金","電子支付","信用卡","銀行帳戶"];
-  const GROUP_KIND = { "電子支付":"asset", "信用卡":"liability", "銀行帳戶":"asset" };
+  const GROUP_KIND = { "現金":"asset", "電子支付":"asset", "信用卡":"liability", "銀行帳戶":"asset" };
   let ACCOUNTS = BASE_ACCOUNTS.filter(a => !deletedAccountIds.includes(a.id)).concat(customAccounts);
   function getAccount(id){ return ACCOUNTS.find(a => a.id === id); }
 
@@ -2267,7 +2267,6 @@ enableIndexedDbPersistence(db).catch(() => {});
   }
 
   function deleteAccount(acct){
-    if(acct.id === "cash"){ showToast("現金帳戶不能刪除"); return; }
     if(isAccountUsedInHistory(acct.id)){
       showToast("這個帳戶已經有使用紀錄，不能刪除，只能改名");
       return;
@@ -2294,6 +2293,7 @@ enableIndexedDbPersistence(db).catch(() => {});
   }
 
   const SINGLE_CURRENCY_GROUPS = ["電子支付","信用卡"];
+  const CURRENCY_SELECT_GROUPS = ["現金","銀行帳戶"];
 
   function renderAcctGroups(){
     settingsAcctGroups.innerHTML = "";
@@ -2309,21 +2309,19 @@ enableIndexedDbPersistence(db).catch(() => {});
         const row = document.createElement("div");
         row.className = "acct-row";
 
-        if(group !== "現金"){
-          const nameInput = document.createElement("input");
-          nameInput.type = "text";
-          nameInput.className = "acct-row-name";
-          nameInput.value = a.name;
-          nameInput.dataset.acct = a.id;
-          row.appendChild(nameInput);
-        }
+        const nameInput = document.createElement("input");
+        nameInput.type = "text";
+        nameInput.className = "acct-row-name";
+        nameInput.value = a.name;
+        nameInput.dataset.acct = a.id;
+        row.appendChild(nameInput);
 
         const existingMap = openings[a.id] || {};
         const existingEntries = Object.entries(existingMap).filter(([,v]) => v !== 0);
 
         let curSelect = null;
         let initCur = DEFAULT_CURRENCY, initAmt = 0;
-        if(group === "銀行帳戶"){
+        if(CURRENCY_SELECT_GROUPS.includes(group)){
           curSelect = document.createElement("select");
           curSelect.className = "acct-row-cur";
           if(existingEntries.length > 0){ initCur = existingEntries[0][0]; initAmt = existingEntries[0][1]; }
@@ -2346,16 +2344,14 @@ enableIndexedDbPersistence(db).catch(() => {});
         if(!curSelect) amtInput.dataset.singleCurrency = DEFAULT_CURRENCY;
         row.appendChild(amtInput);
 
-        if(group !== "現金"){
-          const delBtn = document.createElement("button");
-          delBtn.type = "button";
-          const deletable = !isAccountUsedInHistory(a.id);
-          delBtn.className = deletable ? "ob-rm" : "ob-rm ob-rm-disabled";
-          delBtn.title = deletable ? "刪除這個帳戶（目前沒有使用紀錄）" : "這個帳戶已有使用紀錄，無法刪除";
-          delBtn.textContent = "✕";
-          delBtn.addEventListener("click", () => deleteAccount(a));
-          row.appendChild(delBtn);
-        }
+        const delBtn = document.createElement("button");
+        delBtn.type = "button";
+        const deletable = !isAccountUsedInHistory(a.id);
+        delBtn.className = deletable ? "ob-rm" : "ob-rm ob-rm-disabled";
+        delBtn.title = deletable ? "刪除這個帳戶（目前沒有使用紀錄）" : "這個帳戶已有使用紀錄，無法刪除";
+        delBtn.textContent = "✕";
+        delBtn.addEventListener("click", () => deleteAccount(a));
+        row.appendChild(delBtn);
 
         box.appendChild(row);
 
@@ -2370,7 +2366,7 @@ enableIndexedDbPersistence(db).catch(() => {});
         // If there's more than one non-zero currency stored (e.g. left over from before this
         // account was simplified to a single row, or from an earlier default-currency switch),
         // only one is shown/editable above -- flag the rest so nothing looks like it vanished.
-        const hiddenEntries = group === "銀行帳戶"
+        const hiddenEntries = CURRENCY_SELECT_GROUPS.includes(group)
           ? existingEntries.slice(1)
           : Object.entries(existingMap).filter(([c,v]) => c !== DEFAULT_CURRENCY && v !== 0);
         if(hiddenEntries.length > 0){
@@ -2384,7 +2380,7 @@ enableIndexedDbPersistence(db).catch(() => {});
 
         wrap.appendChild(box);
       });
-      if(group !== "現金"){
+      {
         const addAcctRow = document.createElement("div");
         addAcctRow.className = "add-acct-row";
         addAcctRow.style.marginTop = "4px";
