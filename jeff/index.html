@@ -435,7 +435,16 @@
     border: 1px solid var(--line); background:#fff; border-radius:8px; padding:8px 9px; font-size:16px;
     font-family: var(--font-main); color: var(--ink);
   }
-  .ob-row .ob-rm{ background:none; border:none; color: var(--ink-faint); cursor:pointer; font-size:15.5px; }
+  .ob-rm{
+    background: var(--card); border: 1px solid var(--line); border-radius:8px;
+    color: var(--ink-faint); cursor:pointer; font-size:14px; width:34px; height:34px;
+    flex-shrink:0; display:flex; align-items:center; justify-content:center; padding:0;
+    transition: all .15s ease;
+  }
+  .ob-row .ob-rm{ width:auto; height:auto; border:none; background:none; font-size:15.5px; }
+  .ob-rm:hover{ border-color: var(--clay-deep); color: var(--clay-deep); background: var(--clay-wash); }
+  .ob-rm.ob-rm-disabled{ color: var(--ink-faint); opacity:0.45; cursor:not-allowed; }
+  .ob-rm.ob-rm-disabled:hover{ border-color: var(--line); color: var(--ink-faint); background: var(--card); }
   .ob-add{ background:none; border:none; color: var(--gold); font-size:13.5px; cursor:pointer; padding:4px 0; }
   .name-edit-input{
     width:100%; box-sizing:border-box; border: 1px solid var(--line); background:#fff; border-radius:8px;
@@ -458,6 +467,23 @@
   }
   .cat-chip-editable .cat-rm:hover{ color: var(--clay-deep); }
   .cat-add-row{ display:flex; gap:8px; min-width:0; }
+  .add-acct-row{ display:flex; gap:6px; min-width:0; align-items:center; }
+  .add-acct-name{
+    flex:1.4; min-width:0; border: 1px solid var(--line); background:#fff; border-radius:8px;
+    padding:9px 10px; font-size:16px; color: var(--ink);
+  }
+  .add-acct-cur{
+    flex:0.75; min-width:0; border: 1px solid var(--line); background:#fff; border-radius:8px;
+    padding:9px 6px; font-size:15px; color: var(--ink);
+  }
+  .add-acct-amt{
+    flex:1; min-width:0; border: 1px solid var(--line); background:#fff; border-radius:8px;
+    padding:9px 10px; font-size:16px; color: var(--ink); text-align:right;
+  }
+  .add-acct-btn{
+    background: var(--gold-soft); color: var(--gold); border:none; border-radius:8px;
+    padding:0 14px; height:38px; font-size:13.5px; cursor:pointer; white-space:nowrap; flex-shrink:0;
+  }
   .exrate-box{ background: var(--card-soft); border-radius:12px; padding:12px 14px; margin-bottom:14px; }
   .exrate-row{ display:flex; align-items:center; gap:8px; font-size:13.5px; color: var(--ink); margin-bottom:8px; }
   .exrate-row:last-of-type{ margin-bottom:0; }
@@ -498,6 +524,9 @@
   #obOverlay .cat-chip-editable{ font-size:15px; padding:7px 7px 7px 15px; }
   #obOverlay .cat-add-row input{ font-size:17px; }
   #obOverlay .cat-add-row button{ font-size:14.5px; }
+  #obOverlay .add-acct-name, #obOverlay .add-acct-amt{ font-size:17px; padding:10px 11px; }
+  #obOverlay .add-acct-cur{ font-size:16px; }
+  #obOverlay .add-acct-btn{ font-size:14.5px; }
   #obOverlay .ob-add{ font-size:14.5px; }
   #obOverlay .save-btn{ font-size:17px; }
   #obOverlay #defaultCurrencySelect{ font-size:17px; }
@@ -2289,20 +2318,17 @@ enableIndexedDbPersistence(db).catch(() => {});
           nameRow.appendChild(nameInput);
           const delBtn = document.createElement("button");
           delBtn.type = "button";
-          delBtn.className = "ob-rm";
           const deletable = !isAccountUsedInHistory(a.id);
+          delBtn.className = deletable ? "ob-rm" : "ob-rm ob-rm-disabled";
           delBtn.title = deletable ? "刪除這個帳戶（目前沒有使用紀錄）" : "這個帳戶已有使用紀錄，無法刪除";
-          delBtn.textContent = deletable ? "❌" : "🚫";
-          if(!deletable) delBtn.style.opacity = "0.55";
+          delBtn.textContent = "✕";
           delBtn.addEventListener("click", () => deleteAccount(a));
           nameRow.appendChild(delBtn);
           nameRow.style.marginBottom = "8px";
           box.appendChild(nameRow);
         } else {
-          const label = document.createElement("div");
-          label.className = "ob-name";
-          label.textContent = a.name;
-          box.appendChild(label);
+          // 現金 group has exactly one account whose name is already "現金" (same as the
+          // group heading right above it), so skip the redundant name label entirely.
         }
         if(a.kind === "liability"){
           const hint = document.createElement("div");
@@ -2340,27 +2366,59 @@ enableIndexedDbPersistence(db).catch(() => {});
       });
       if(group !== "現金"){
         const addAcctRow = document.createElement("div");
-        addAcctRow.className = "cat-add-row";
+        addAcctRow.className = "add-acct-row";
         addAcctRow.style.marginTop = "4px";
-        const input = document.createElement("input");
-        input.type = "text";
-        input.placeholder = "新增帳戶名稱";
+
+        const nameInput2 = document.createElement("input");
+        nameInput2.type = "text";
+        nameInput2.className = "add-acct-name";
+        nameInput2.placeholder = "帳戶名稱";
+        addAcctRow.appendChild(nameInput2);
+
+        let curSelect2 = null;
+        if(!SINGLE_CURRENCY_GROUPS.includes(group)){
+          curSelect2 = document.createElement("select");
+          curSelect2.className = "add-acct-cur";
+          Object.keys(CURRENCIES).forEach(code => {
+            const opt = document.createElement("option");
+            opt.value = code; opt.textContent = code;
+            if(code === DEFAULT_CURRENCY) opt.selected = true;
+            curSelect2.appendChild(opt);
+          });
+          addAcctRow.appendChild(curSelect2);
+        }
+
+        const amtInput2 = document.createElement("input");
+        amtInput2.type = "text"; amtInput2.inputMode = "decimal"; amtInput2.autocomplete = "off";
+        amtInput2.className = "add-acct-amt";
+        amtInput2.placeholder = "金額";
+        addAcctRow.appendChild(amtInput2);
+
         const addBtn2 = document.createElement("button");
         addBtn2.type = "button";
-        addBtn2.textContent = "＋ 新增帳戶";
+        addBtn2.className = "add-acct-btn";
+        addBtn2.textContent = "＋ 新增";
         const doAddAccount = () => {
-          const val = input.value.trim();
-          if(!val) return;
+          const val = nameInput2.value.trim();
+          if(!val){ showToast("請輸入帳戶名稱"); return; }
           if(ACCOUNTS.some(a => a.name === val && a.group === group)){ showToast("這個帳戶名稱已經存在了"); return; }
           const newId = "custom_" + group.replace(/[^a-zA-Z0-9]/g,"") + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
           const newAcct = { id:newId, name:val, kind: GROUP_KIND[group] || "asset", group };
           persistCustomAccounts(customAccounts.concat([newAcct]));
+          const amt = parseFloat(amtInput2.value) || 0;
+          if(amt !== 0){
+            const cur = curSelect2 ? curSelect2.value : DEFAULT_CURRENCY;
+            const newOpenings = Object.assign({}, openings, { [newId]: { [cur]: amt } });
+            persistOpenings(newOpenings);
+          }
           renderAcctGroups();
           showToast("已新增帳戶");
         };
         addBtn2.addEventListener("click", doAddAccount);
-        input.addEventListener("keydown", (e) => { if(e.key === "Enter"){ e.preventDefault(); doAddAccount(); } });
-        addAcctRow.appendChild(input); addAcctRow.appendChild(addBtn2);
+        [nameInput2, amtInput2].forEach(el => {
+          el.addEventListener("keydown", (e) => { if(e.key === "Enter"){ e.preventDefault(); doAddAccount(); } });
+        });
+        addAcctRow.appendChild(addBtn2);
         wrap.appendChild(addAcctRow);
       }
       settingsAcctGroups.appendChild(wrap);
