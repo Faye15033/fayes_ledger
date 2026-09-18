@@ -285,6 +285,11 @@
   .day-group{ margin-bottom: 18px; }
   .day-head{ display:flex; align-items:center; gap:10px; color: var(--ink-faint); font-size:13.5px; letter-spacing:0.08em; margin: 0 4px 8px; }
   .day-head .line{ flex:1; height:1px; background: repeating-linear-gradient(90deg, var(--line) 0 4px, transparent 4px 8px); }
+  .day-group.future .day-head span{ color: var(--gold); font-weight:600; }
+  .day-group.future .day-head .line{ background: repeating-linear-gradient(90deg, var(--gold) 0 4px, transparent 4px 8px); opacity:0.55; }
+  .day-group.future .tx-card{ opacity:0.7; border-left-style: dashed; }
+  .today-divider{ display:flex; align-items:center; gap:10px; margin: 2px 4px 18px; font-size:11.5px; letter-spacing:0.2em; color: var(--gold); }
+  .today-divider .line{ flex:1; height:1px; background: var(--gold); opacity:0.45; }
 
   .tx-card{
     background: var(--card); border-radius: 12px; padding: 13px 16px;
@@ -1665,14 +1670,25 @@ enableIndexedDbPersistence(db).catch(() => {});
     }
     const groups = {};
     monthTx.forEach(t => { groups[t.date] = groups[t.date] || []; groups[t.date].push(t); });
-    Object.keys(groups).sort().reverse().forEach(date => {
+    const todayStr = localDateStr(new Date());
+    const sortedDates = Object.keys(groups).sort().reverse();
+    let dividerInserted = false;
+    sortedDates.forEach((date, idx) => {
+      const isFuture = date > todayStr;
+      if(!isFuture && !dividerInserted && idx > 0 && sortedDates[idx-1] > todayStr){
+        const divider = document.createElement("div");
+        divider.className = "today-divider";
+        divider.innerHTML = `<div class="line"></div><span>今天</span><div class="line"></div>`;
+        txList.appendChild(divider);
+        dividerInserted = true;
+      }
       const d = new Date(date + "T00:00:00");
-      const dayStr = (d.getMonth()+1) + "/" + d.getDate() + "（" + "日一二三四五六"[d.getDay()] + "）";
+      const dayStr = (d.getMonth()+1) + "/" + d.getDate() + "（" + "日一二三四五六"[d.getDay()] + "）" + (isFuture ? "・尚未發生" : "");
       const dayHead = document.createElement("div");
       dayHead.className = "day-head";
       dayHead.innerHTML = `<span>${dayStr}</span><div class="line"></div>`;
       const groupWrap = document.createElement("div");
-      groupWrap.className = "day-group";
+      groupWrap.className = "day-group" + (isFuture ? " future" : "");
       groupWrap.appendChild(dayHead);
 
       groups[date].forEach(t => {
@@ -2076,6 +2092,15 @@ enableIndexedDbPersistence(db).catch(() => {});
       tx.account = acctInput.value;
     }
     const wasEditing = !!editingId;
+    const todayObj = new Date();
+    const curRealMonthKey = todayObj.getFullYear() + "-" + String(todayObj.getMonth()+1).padStart(2,"0");
+    const dateMonthKey = tx.date.slice(0,7);
+    const dateChanged = !editingOriginal || editingOriginal.date !== tx.date;
+    if(dateMonthKey !== curRealMonthKey && dateChanged){
+      const dObj = new Date(tx.date + "T00:00:00");
+      const label = dObj.getFullYear() + "年" + (dObj.getMonth()+1) + "月" + dObj.getDate() + "日";
+      if(!confirm(`這筆的日期是 ${label}，不是本月，確定要這樣記嗎？`)) return;
+    }
     current = new Date(tx.date + "T00:00:00"); current.setDate(1);
     persistTxUpsert(tx);
     closeModal();
