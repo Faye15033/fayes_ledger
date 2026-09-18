@@ -479,6 +479,8 @@
     flex:1; min-width:0; color: var(--ink);
   }
   .ob-name-hint{ font-size:12.5px; color: var(--ink-faint); white-space:nowrap; }
+  .ob-acct-del{ background:none; border:none; color: var(--ink-faint); cursor:pointer; font-size:14px; padding:2px 4px; flex-shrink:0; }
+  .ob-acct-del:hover{ color: var(--clay-deep); }
   .ob-row{ display:grid; grid-template-columns: 1fr 1fr auto; gap:8px; margin-bottom:8px; align-items:center; }
   .ob-row select, .ob-row input{
     border: 1px solid var(--line); background:#fff; border-radius:8px; padding:8px 9px; font-size:16px;
@@ -486,6 +488,13 @@
   }
   .ob-row .ob-rm{ background:none; border:none; color: var(--ink-faint); cursor:pointer; font-size:15.5px; }
   .ob-add{ background:none; border:none; color: var(--gold); font-size:13.5px; cursor:pointer; padding:4px 0; }
+  .ob-add-account{ border-top: 1px dashed var(--line); padding-top: 14px; margin-top: 4px; }
+  .ob-add-account .ob-account{ background: var(--gold-soft); }
+  .ob-add-account select.ob-new-group{
+    width:100%; border:1px solid var(--line); background:#fff; border-radius:8px; padding:8px 9px;
+    font-size:14px; margin-bottom:8px; color: var(--ink);
+  }
+  .ob-add-account .ob-name-input{ width:100%; margin-bottom:8px; }
 
   /* ---------- Illustrations ---------- */
   .brand-row{ display:flex; align-items:center; gap:10px; }
@@ -938,6 +947,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     { id:"bank_hsbc_hk", name:"匯豐HK", kind:"asset", group:"銀行帳戶" }
   ];
   const ACCOUNT_GROUPS = ["現金","電子支付","信用卡","銀行帳戶"];
+  const BASE_ACCOUNTS = ACCOUNTS.map(a => Object.assign({}, a));
   function getAccount(id){ return ACCOUNTS.find(a => a.id === id); }
 
   const GROUP_ICONS = {
@@ -951,6 +961,7 @@ enableIndexedDbPersistence(db).catch(() => {});
   const OPENING_KEY = "shiguang_ledger_openings_v1";
   const ONBOARD_KEY = "shiguang_ledger_onboarded_v1";
   const ACCOUNT_NAMES_KEY = "shiguang_ledger_account_names_v1";
+  const CUSTOM_ACCOUNTS_KEY = "shiguang_ledger_custom_accounts_v1";
 
   let transactions = [];
   try{ transactions = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }catch(e){ transactions = []; }
@@ -960,10 +971,32 @@ enableIndexedDbPersistence(db).catch(() => {});
 
   let accountNames = {}; // { accountId: "自訂名稱" }
   try{ accountNames = JSON.parse(localStorage.getItem(ACCOUNT_NAMES_KEY) || "{}"); }catch(e){ accountNames = {}; }
-  function applyAccountNames(){
+
+  let customAccounts = []; // [{ id, name, kind, group, currency }]
+  try{ customAccounts = JSON.parse(localStorage.getItem(CUSTOM_ACCOUNTS_KEY) || "[]"); }catch(e){ customAccounts = []; }
+  function saveCustomAccountsLocal(){ localStorage.setItem(CUSTOM_ACCOUNTS_KEY, JSON.stringify(customAccounts)); }
+
+  function rebuildAccounts(){
+    ACCOUNTS.length = 0;
+    BASE_ACCOUNTS.forEach(a => ACCOUNTS.push(Object.assign({}, a)));
+    customAccounts.forEach(a => {
+      if(!ACCOUNTS.find(x => x.id === a.id)) ACCOUNTS.push(Object.assign({}, a));
+    });
     ACCOUNTS.forEach(a => { if(accountNames[a.id]) a.name = accountNames[a.id]; });
   }
+  function applyAccountNames(){ rebuildAccounts(); }
   applyAccountNames();
+
+  async function persistCustomAccounts(){
+    saveCustomAccountsLocal();
+    rebuildAccounts();
+    if(typeof refreshAccountLabelsUI === "function") refreshAccountLabelsUI();
+    render();
+    if(currentUser){
+      try{ await setDoc(doc(db, "users", currentUser.uid, "settings", "customAccounts"), { list: customAccounts }); }
+      catch(e){ showToast("雲端同步失敗，稍後會自動重試"); }
+    }
+  }
 
   const RECURRING_KEY = "shiguang_ledger_recurring_v1";
   let recurringRules = [];
@@ -980,6 +1013,7 @@ enableIndexedDbPersistence(db).catch(() => {});
   let unsubTx = null;
   let unsubOpenings = null;
   let unsubAccountNames = null;
+  let unsubCustomAccounts = null;
   let unsubCategories = null;
   let unsubFxRates = null;
   let unsubRecurring = null;
@@ -1077,6 +1111,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     if(unsubTx) unsubTx();
     if(unsubOpenings) unsubOpenings();
     if(unsubAccountNames) unsubAccountNames();
+    if(unsubCustomAccounts) unsubCustomAccounts();
     if(unsubCategories) unsubCategories();
     if(unsubFxRates) unsubFxRates();
     if(unsubRecurring) unsubRecurring();
@@ -1099,6 +1134,15 @@ enableIndexedDbPersistence(db).catch(() => {});
       accountNames = snap.exists() ? snap.data() : {};
       saveAccountNamesLocal();
       applyAccountNames();
+      refreshAccountLabelsUI();
+      render();
+    }, () => {});
+
+    const customAcctsDoc = doc(db, "users", uid, "settings", "customAccounts");
+    unsubCustomAccounts = onSnapshot(customAcctsDoc, snap => {
+      customAccounts = snap.exists() ? (snap.data().list || []) : [];
+      saveCustomAccountsLocal();
+      rebuildAccounts();
       refreshAccountLabelsUI();
       render();
     }, () => {});
@@ -1135,6 +1179,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     if(unsubTx){ unsubTx(); unsubTx = null; }
     if(unsubOpenings){ unsubOpenings(); unsubOpenings = null; }
     if(unsubAccountNames){ unsubAccountNames(); unsubAccountNames = null; }
+    if(unsubCustomAccounts){ unsubCustomAccounts(); unsubCustomAccounts = null; }
     if(unsubCategories){ unsubCategories(); unsubCategories = null; }
     if(unsubFxRates){ unsubFxRates(); unsubFxRates = null; }
     if(unsubRecurring){ unsubRecurring(); unsubRecurring = null; }
@@ -2687,6 +2732,7 @@ enableIndexedDbPersistence(db).catch(() => {});
       wrap.className = "ob-group";
       wrap.innerHTML = `<h4>${group}</h4>`;
       ACCOUNTS.filter(a => a.group === group).forEach(a => {
+        const isCustom = !!customAccounts.find(c => c.id === a.id);
         const box = document.createElement("div");
         box.className = "ob-account";
         box.dataset.acct = a.id;
@@ -2704,23 +2750,93 @@ enableIndexedDbPersistence(db).catch(() => {});
           hint.textContent = "（未繳金額）";
           nameRow.appendChild(hint);
         }
+        if(isCustom){
+          const delBtn = document.createElement("button");
+          delBtn.type = "button"; delBtn.className = "ob-acct-del"; delBtn.textContent = "🗑";
+          delBtn.title = "刪除這個帳戶";
+          delBtn.addEventListener("click", () => deleteCustomAccount(a.id, box));
+          nameRow.appendChild(delBtn);
+        }
         const rowsEl = document.createElement("div");
         rowsEl.className = "ob-rows";
-        const addBtn = document.createElement("button");
-        addBtn.type = "button"; addBtn.className = "ob-add"; addBtn.textContent = "＋ 新增幣別";
         box.appendChild(nameRow);
         box.appendChild(rowsEl);
-        box.appendChild(addBtn);
         const existing = openings[a.id] || {};
         const entries = Object.entries(existing);
-        if(entries.length === 0) entries.push([DEFAULT_CURRENCY, 0]);
+        if(entries.length === 0) entries.push([a.currency || DEFAULT_CURRENCY, 0]);
         entries.forEach(([cur, amt]) => addObRow(rowsEl, cur, amt));
-        addBtn.addEventListener("click", () => addObRow(rowsEl, DEFAULT_CURRENCY, 0));
         wrap.appendChild(box);
       });
       obGroups.appendChild(wrap);
     });
+    obGroups.appendChild(buildAddAccountSection());
     obOverlay.classList.add("open");
+  }
+  function deleteCustomAccount(id, box){
+    const hasTx = transactions.some(t => t.account === id || t.fromAccount === id || t.toAccount === id);
+    const hasOpening = openings[id] && Object.values(openings[id]).some(v => Number(v) !== 0);
+    if(hasTx || hasOpening){
+      showToast("這個帳戶有歷史紀錄或餘額，無法刪除");
+      return;
+    }
+    if(!confirm("確定要刪除這個帳戶嗎？")) return;
+    customAccounts = customAccounts.filter(c => c.id !== id);
+    if(openings[id]){ delete openings[id]; saveOpeningsLocal(); }
+    persistCustomAccounts();
+    box.remove();
+    showToast("已刪除帳戶");
+  }
+  function buildAddAccountSection(){
+    const wrap = document.createElement("div");
+    wrap.className = "ob-group ob-add-account";
+    wrap.innerHTML = `<h4>新增帳戶</h4>`;
+    const box = document.createElement("div");
+    box.className = "ob-account";
+    const groupSel = document.createElement("select");
+    groupSel.className = "ob-new-group";
+    ACCOUNT_GROUPS.forEach(g => {
+      const opt = document.createElement("option");
+      opt.value = g; opt.textContent = g;
+      groupSel.appendChild(opt);
+    });
+    const nameInput = document.createElement("input");
+    nameInput.type = "text"; nameInput.className = "ob-name-input"; nameInput.placeholder = "帳戶名稱";
+    const row = document.createElement("div");
+    row.className = "ob-row";
+    const curSel = document.createElement("select");
+    Object.keys(CURRENCIES).forEach(code => {
+      const opt = document.createElement("option");
+      opt.value = code; opt.textContent = code;
+      if(code === DEFAULT_CURRENCY) opt.selected = true;
+      curSel.appendChild(opt);
+    });
+    const amtInput = document.createElement("input");
+    amtInput.type = "number"; amtInput.step = "0.01"; amtInput.inputMode = "decimal"; amtInput.placeholder = "餘額";
+    sanitizeNumericInput(amtInput);
+    row.appendChild(curSel); row.appendChild(amtInput);
+    const addBtn = document.createElement("button");
+    addBtn.type = "button"; addBtn.className = "save-btn ghost"; addBtn.style.marginTop = "6px";
+    addBtn.textContent = "＋ 建立這個帳戶";
+    addBtn.addEventListener("click", () => {
+      const name = nameInput.value.trim();
+      if(!name){ showToast("請輸入帳戶名稱"); return; }
+      const group = groupSel.value;
+      const kind = group === "信用卡" ? "liability" : "asset";
+      const id = "custom_" + (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random()));
+      const amt = parseFloat(amtInput.value) || 0;
+      const newAcct = { id, name, kind, group, currency: curSel.value };
+      customAccounts.push(newAcct);
+      if(amt !== 0){ openings[id] = { [curSel.value]: amt }; saveOpeningsLocal(); }
+      persistCustomAccounts();
+      showToast("已新增帳戶");
+      openOnboarding();
+    });
+    box.appendChild(groupSel);
+    box.appendChild(nameInput);
+    box.appendChild(row);
+    box.appendChild(addBtn);
+    wrap.appendChild(box);
+    return wrap;
   }
   function addObRow(rowsEl, cur, amt){
     const row = document.createElement("div");
@@ -2753,7 +2869,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     }
     const newOpenings = {};
     const newNames = {};
-    obGroups.querySelectorAll(".ob-account").forEach(box => {
+    obGroups.querySelectorAll(".ob-account[data-acct]").forEach(box => {
       const acctId = box.dataset.acct;
       const map = {};
       box.querySelectorAll(".ob-row").forEach(row => {
