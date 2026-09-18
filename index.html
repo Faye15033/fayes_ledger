@@ -189,6 +189,10 @@
   .cny::before{ content:"NT$ "; font-size:14.5px; opacity:0.6; }
 
   .fx-summary{ margin-bottom: 22px; }
+  .fx-rate-warn{
+    background: var(--gold-soft); color: var(--gold); border-radius: 10px; padding: 8px 12px;
+    font-size: 12px; line-height:1.6; margin: -10px 0 16px; text-align:center;
+  }
   .fx-chip{
     display:inline-flex; align-items:center; gap:5px; font-size:13px;
     background: var(--card-soft); color: var(--ink-soft); border-radius: 8px;
@@ -574,6 +578,7 @@
     <div class="sum-card expense"><div class="label">支出</div><div class="num cny" id="sumExpense">0</div></div>
     <div class="sum-card balance"><div class="label">結餘</div><div class="num cny" id="sumBalance">0</div></div>
   </div>
+  <div class="fx-rate-warn" id="fxRateWarn" style="display:none;">有幣別還沒設定匯率，暫以 0 計算，換算結果不準確——可以到下面「細項趨勢」設定匯率</div>
 
   <div class="fx-summary" id="fxSummary"></div>
 
@@ -1451,11 +1456,17 @@ enableIndexedDbPersistence(db).catch(() => {});
     const el = document.getElementById("monthlyHistoryList");
     const byMonth = {};
     transactions.forEach(t => {
-      if(txCurrency(t) !== DEFAULT_CURRENCY) return;
+      const cur = txCurrency(t);
+      let rate = 1;
+      if(cur !== DEFAULT_CURRENCY){
+        rate = fxRates[cur];
+        rate = (rate == null) ? 0 : rate;
+      }
+      const converted = t.amount * rate;
       const key = t.date.slice(0,7);
       if(!byMonth[key]) byMonth[key] = { income: 0, expense: 0 };
-      if(t.type === "income") byMonth[key].income += t.amount;
-      else if(t.type === "expense") byMonth[key].expense += t.amount;
+      if(t.type === "income") byMonth[key].income += converted;
+      else if(t.type === "expense") byMonth[key].expense += converted;
     });
     const keys = Object.keys(byMonth).sort().reverse();
     if(keys.length === 0){
@@ -1666,20 +1677,29 @@ enableIndexedDbPersistence(db).catch(() => {});
     let income = 0, expense = 0;
     const incomeByCat = {}, expenseByCat = {};
     const fxIncome = {}, fxExpense = {};
+    let hasUnsetRate = false;
     monthTx.forEach(t => {
       const cur = txCurrency(t);
+      let rate = 1;
+      if(cur !== DEFAULT_CURRENCY){
+        rate = fxRates[cur];
+        if(rate == null || rate === 0){ hasUnsetRate = true; rate = rate || 0; }
+      }
+      const converted = t.amount * rate;
       if(t.type === "income"){
-        if(cur === DEFAULT_CURRENCY){ income += t.amount; incomeByCat[t.category] = (incomeByCat[t.category]||0) + t.amount; }
-        else { fxIncome[cur] = (fxIncome[cur]||0) + t.amount; }
+        income += converted; incomeByCat[t.category] = (incomeByCat[t.category]||0) + converted;
+        if(cur !== DEFAULT_CURRENCY) fxIncome[cur] = (fxIncome[cur]||0) + t.amount;
       } else if(t.type === "expense"){
-        if(cur === DEFAULT_CURRENCY){ expense += t.amount; expenseByCat[t.category] = (expenseByCat[t.category]||0) + t.amount; }
-        else { fxExpense[cur] = (fxExpense[cur]||0) + t.amount; }
+        expense += converted; expenseByCat[t.category] = (expenseByCat[t.category]||0) + converted;
+        if(cur !== DEFAULT_CURRENCY) fxExpense[cur] = (fxExpense[cur]||0) + t.amount;
       }
     });
 
     sumIncome.textContent = fmt(income);
     sumExpense.textContent = fmt(expense);
     sumBalance.textContent = fmt(income - expense);
+    const fxRateWarnEl = document.getElementById("fxRateWarn");
+    if(fxRateWarnEl) fxRateWarnEl.style.display = hasUnsetRate ? "block" : "none";
 
     renderBreakdown(bdIncome, incomeByCat, income, "income");
     renderBreakdown(bdExpense, expenseByCat, expense, "expense");
