@@ -328,6 +328,14 @@
   .day-group{ margin-bottom: 18px; }
   .day-head{ display:flex; align-items:center; gap:10px; color: var(--ink-faint); font-size:13.5px; letter-spacing:0.08em; margin: 0 4px 8px; }
   .day-head .line{ flex:1; height:1px; background: repeating-linear-gradient(90deg, var(--line) 0 4px, transparent 4px 8px); }
+  .day-head.future{ color: var(--gold); }
+  .day-head.future .line{ background: repeating-linear-gradient(90deg, var(--gold-soft) 0 4px, transparent 4px 8px); }
+  .day-group.future .tx-card{ border-left-style: dashed; opacity: 0.75; }
+  .future-divider{
+    display:flex; align-items:center; gap:10px; margin: 4px 4px 20px; color: var(--gold);
+    font-size:12px; letter-spacing:0.14em; font-weight:600;
+  }
+  .future-divider::before, .future-divider::after{ content:""; flex:1; height:1px; background: var(--gold); opacity:0.5; }
 
   .tx-card{
     background: var(--card); border-radius: 12px; padding: 13px 16px;
@@ -1728,14 +1736,27 @@ enableIndexedDbPersistence(db).catch(() => {});
     }
     const groups = {};
     monthTx.forEach(t => { groups[t.date] = groups[t.date] || []; groups[t.date].push(t); });
-    Object.keys(groups).sort().reverse().forEach(date => {
+    const today = localDateStr();
+    const sortedDates = Object.keys(groups).sort().reverse();
+    const hasFuture = sortedDates.some(d => d > today);
+    const hasNotFuture = sortedDates.some(d => d <= today);
+    let dividerInserted = false;
+    sortedDates.forEach(date => {
+      if(hasFuture && hasNotFuture && !dividerInserted && date <= today){
+        const divider = document.createElement("div");
+        divider.className = "future-divider";
+        divider.innerHTML = `<span>尚未發生</span>`;
+        txList.appendChild(divider);
+        dividerInserted = true;
+      }
+      const isFuture = date > today;
       const d = new Date(date + "T00:00:00");
       const dayStr = (d.getMonth()+1) + "/" + d.getDate() + "（" + "日一二三四五六"[d.getDay()] + "）";
       const dayHead = document.createElement("div");
-      dayHead.className = "day-head";
-      dayHead.innerHTML = `<span>${dayStr}</span><div class="line"></div>`;
+      dayHead.className = "day-head" + (isFuture ? " future" : "");
+      dayHead.innerHTML = `<span>${dayStr}${isFuture ? "　未來" : ""}</span><div class="line"></div>`;
       const groupWrap = document.createElement("div");
-      groupWrap.className = "day-group";
+      groupWrap.className = "day-group" + (isFuture ? " future" : "");
       groupWrap.appendChild(dayHead);
 
       groups[date].forEach(t => {
@@ -2172,6 +2193,14 @@ enableIndexedDbPersistence(db).catch(() => {});
       amt = evaluateExpr(amountInput.value);
       cur = (activeType === "transfer") ? DEFAULT_CURRENCY : (currencyInput.value || DEFAULT_CURRENCY);
       if(!amt || amt <= 0){ showToast("請輸入正確的金額或算式"); return; }
+    }
+
+    if(dateInput.value){
+      const todayMonth = localDateStr().slice(0,7);
+      if(dateInput.value.slice(0,7) !== todayMonth){
+        const [yy, mm] = dateInput.value.split("-");
+        if(!confirm(`這筆日期是 ${yy} 年 ${parseInt(mm,10)} 月，不是本月，確定要這樣記帳嗎？`)) return;
+      }
     }
 
     const original = editingTxId ? transactions.find(x => x.id === editingTxId) : null;
@@ -2786,6 +2815,19 @@ enableIndexedDbPersistence(db).catch(() => {});
     box.remove();
     showToast("已刪除帳戶");
   }
+  let newAcctNameInput, newAcctGroupSel, newAcctCurSel, newAcctAmtInput;
+  function createNewAccountIfFilled(){
+    if(!newAcctNameInput) return null;
+    const name = newAcctNameInput.value.trim();
+    if(!name) return null;
+    const group = newAcctGroupSel.value;
+    const kind = group === "信用卡" ? "liability" : "asset";
+    const id = "custom_" + (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random()));
+    const amt = parseFloat(newAcctAmtInput.value) || 0;
+    const cur = newAcctCurSel.value;
+    customAccounts.push({ id, name, kind, group, currency: cur });
+    return { id, amt, cur };
+  }
   function buildAddAccountSection(){
     const wrap = document.createElement("div");
     wrap.className = "ob-group ob-add-account";
@@ -2814,19 +2856,14 @@ enableIndexedDbPersistence(db).catch(() => {});
     amtInput.type = "number"; amtInput.step = "0.01"; amtInput.inputMode = "decimal"; amtInput.placeholder = "餘額";
     sanitizeNumericInput(amtInput);
     row.appendChild(curSel); row.appendChild(amtInput);
+    newAcctNameInput = nameInput; newAcctGroupSel = groupSel; newAcctCurSel = curSel; newAcctAmtInput = amtInput;
     const addBtn = document.createElement("button");
     addBtn.type = "button"; addBtn.className = "save-btn ghost"; addBtn.style.marginTop = "6px";
     addBtn.textContent = "＋ 建立這個帳戶";
     addBtn.addEventListener("click", () => {
-      const name = nameInput.value.trim();
-      if(!name){ showToast("請輸入帳戶名稱"); return; }
-      const group = groupSel.value;
-      const kind = group === "信用卡" ? "liability" : "asset";
-      const id = "custom_" + (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random()));
-      const amt = parseFloat(amtInput.value) || 0;
-      const newAcct = { id, name, kind, group, currency: curSel.value };
-      customAccounts.push(newAcct);
-      if(amt !== 0){ openings[id] = { [curSel.value]: amt }; saveOpeningsLocal(); }
+      if(!nameInput.value.trim()){ showToast("請輸入帳戶名稱"); return; }
+      const created = createNewAccountIfFilled();
+      if(created && created.amt !== 0){ openings[created.id] = { [created.cur]: created.amt }; saveOpeningsLocal(); }
       persistCustomAccounts();
       showToast("已新增帳戶");
       openOnboarding();
@@ -2867,6 +2904,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     if(Object.keys(openings).length > 0){
       if(!confirm("你已經設定過起始餘額，再次儲存將會覆蓋原本的數值，確定要覆蓋嗎？")) return;
     }
+    const createdAcct = createNewAccountIfFilled();
     const newOpenings = {};
     const newNames = {};
     obGroups.querySelectorAll(".ob-account[data-acct]").forEach(box => {
@@ -2882,10 +2920,14 @@ enableIndexedDbPersistence(db).catch(() => {});
       const defaultAcct = ACCOUNTS.find(a => a.id === acctId);
       if(nameVal && defaultAcct) newNames[acctId] = nameVal;
     });
+    if(createdAcct && createdAcct.amt !== 0){
+      newOpenings[createdAcct.id] = { [createdAcct.cur]: createdAcct.amt };
+    }
     persistOpenings(newOpenings);
     persistAccountNames(newNames);
+    if(createdAcct) persistCustomAccounts();
     closeOnboarding();
-    showToast("已更新起始餘額");
+    showToast(createdAcct ? "已更新起始餘額，並新增了帳戶" : "已更新起始餘額");
   });
 
   document.getElementById("settingsBtn").addEventListener("click", openOnboarding);
