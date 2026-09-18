@@ -1517,6 +1517,9 @@ enableIndexedDbPersistence(db).catch(() => {});
   const trendFxRow = document.getElementById("trendFxRow");
   function fillTrendCatSelect(){
     trendCatSelect.innerHTML = "";
+    const totalOpt = document.createElement("option");
+    totalOpt.value = "__TOTAL__"; totalOpt.textContent = "合計";
+    trendCatSelect.appendChild(totalOpt);
     CATS[trendType].forEach(cat => {
       const opt = document.createElement("option");
       opt.value = cat; opt.textContent = cat;
@@ -1585,12 +1588,14 @@ enableIndexedDbPersistence(db).catch(() => {});
     const wrap = document.getElementById("trendChartWrap");
     if(!wrap) return;
     const cat = trendCatSelect.value;
-    const allTx = transactions.filter(t => t.type === trendType && t.category === cat);
+    const isTotal = cat === "__TOTAL__";
+    const catLabel = isTotal ? "合計" : cat;
+    const allTx = transactions.filter(t => t.type === trendType && (isTotal || t.category === cat));
     const currencies = [...new Set(allTx.map(t => txCurrency(t)).filter(c => c !== DEFAULT_CURRENCY))].sort();
     renderFxRateInputs(currencies);
 
     if(allTx.length === 0){
-      wrap.innerHTML = `<div class="trend-empty">「${cat}」目前還沒有紀錄可以畫趨勢圖</div>`;
+      wrap.innerHTML = `<div class="trend-empty">「${catLabel}」目前還沒有紀錄可以畫趨勢圖</div>`;
       return;
     }
     const allMonths = [...new Set(allTx.map(t => t.date.slice(0,7)))].sort();
@@ -1660,7 +1665,7 @@ enableIndexedDbPersistence(db).catch(() => {});
           ${dots}
           ${xLabels}
         </svg>
-        <div class="trend-total">${cat}期間合計 ${trendType==='income'?'收入':'支出'} NT$ ${fmt(total)}<br>月平均 NT$ ${fmt(avg)}（共 ${keys.length} 個月）</div>
+        <div class="trend-total">${catLabel}期間合計 ${trendType==='income'?'收入':'支出'} NT$ ${fmt(total)}<br>月平均 NT$ ${fmt(avg)}（共 ${keys.length} 個月）</div>
       </div>
     `;
   }
