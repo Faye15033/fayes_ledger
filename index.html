@@ -2820,6 +2820,11 @@ enableIndexedDbPersistence(db).catch(() => {});
     if(!newAcctNameInput) return null;
     const name = newAcctNameInput.value.trim();
     if(!name) return null;
+    const dup = ACCOUNTS.find(a => a.name === name);
+    if(dup){
+      showToast(`已經有一個帳戶叫「${name}」了，換個名字吧`);
+      return "DUP";
+    }
     const group = newAcctGroupSel.value;
     const kind = group === "信用卡" ? "liability" : "asset";
     const id = "custom_" + (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random()));
@@ -2863,7 +2868,8 @@ enableIndexedDbPersistence(db).catch(() => {});
     addBtn.addEventListener("click", () => {
       if(!nameInput.value.trim()){ showToast("請輸入帳戶名稱"); return; }
       const created = createNewAccountIfFilled();
-      if(created && created.amt !== 0){ openings[created.id] = { [created.cur]: created.amt }; saveOpeningsLocal(); }
+      if(!created || created === "DUP") return;
+      if(created.amt !== 0){ openings[created.id] = { [created.cur]: created.amt }; saveOpeningsLocal(); }
       persistCustomAccounts();
       showToast("已新增帳戶");
       openOnboarding();
@@ -2904,7 +2910,8 @@ enableIndexedDbPersistence(db).catch(() => {});
     if(Object.keys(openings).length > 0){
       if(!confirm("你已經設定過起始餘額，再次儲存將會覆蓋原本的數值，確定要覆蓋嗎？")) return;
     }
-    const createdAcct = createNewAccountIfFilled();
+    let createdAcct = createNewAccountIfFilled();
+    if(createdAcct === "DUP") createdAcct = null;
     const newOpenings = {};
     const newNames = {};
     obGroups.querySelectorAll(".ob-account[data-acct]").forEach(box => {
