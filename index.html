@@ -30,10 +30,10 @@
     --clay-soft: #f5e0d2;
     --clay-wash: #faeee5;
 
-    --slate: #5f8791;
-    --slate-deep: #3f6169;
-    --slate-soft: #dbe7ea;
-    --slate-wash: #ebf1f2;
+    --slate: #8670b3;
+    --slate-deep: #5f4a85;
+    --slate-soft: #e5dcf0;
+    --slate-wash: #f1ebf8;
 
     --gold: #bd8535;
     --gold-soft: #f2e6cd;
@@ -179,22 +179,21 @@
 
   /* ---------- Summary ---------- */
   .summary{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom: 12px; }
-  .sum-card{ background: var(--card); border-radius: 14px; padding: 18px 16px; box-shadow: var(--shadow); position:relative; overflow:hidden; }
+  .sum-card{ background: var(--card); border-radius: 14px; padding: 18px 16px; box-shadow: var(--shadow); position:relative; overflow:hidden; border: 1.5px solid var(--line); transition: all .15s ease; }
   .sum-card .label{ font-size:13.5px; letter-spacing:0.15em; color: var(--ink-soft); margin-bottom:8px; }
   .sum-card .num{ font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif; font-size: 29px; font-weight:700; }
-  .sum-card.income{ background: var(--sage-soft); border: 1.5px solid var(--sage); cursor:pointer; transition: all .15s ease; }
+  .sum-card.income{ background: var(--sage-soft); border-color: var(--sage); cursor:pointer; }
   .sum-card.income .label{ color: var(--sage-deep); opacity:0.8; }
   .sum-card.income .num{ color: var(--sage-deep); }
   .sum-card.income:hover{ transform: translateY(-2px); box-shadow: 0 6px 16px rgba(51,64,74,0.12); }
-  .sum-card.expense{ background: var(--clay-soft); border: 1.5px solid var(--clay); cursor:pointer; transition: all .15s ease; }
+  .sum-card.expense{ background: var(--clay-soft); border-color: var(--clay); cursor:pointer; }
   .sum-card.expense .label{ color: var(--clay-deep); opacity:0.8; }
   .sum-card.expense .num{ color: var(--clay-deep); }
   .sum-card.expense:hover{ transform: translateY(-2px); box-shadow: 0 6px 16px rgba(51,64,74,0.12); }
   .summary-balance{ margin-bottom: 14px; }
   .summary-balance .sum-card{ padding: 11px 16px; display:flex; align-items:center; justify-content:space-between; }
   .summary-balance .sum-card .label{ margin-bottom:0; }
-  .sum-card.balance{ background: linear-gradient(135deg, var(--card) 55%, var(--gold-soft)); }
-  .sum-card.balance::after{ content:""; position:absolute; right:-18px; top:-18px; width:70px; height:70px; border-radius:50%; border:1px dashed var(--gold); opacity:0.5; }
+  .sum-card.balance{ background: var(--gold-soft); border-color: var(--gold); }
   .sum-card.balance .num{ color: var(--gold); }
   .cny::before{ content:"NT$ "; font-size:14.5px; opacity:0.6; }
 
@@ -1720,7 +1719,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     if(typeof renderReminders === "function") renderReminders();
   }
 
-  const PIE_COLORS = ["#c07953","#3f6169","#bd8535","#5f8791","#9c5636","#8aa9ad","#dba852","#7f9c9f","#a56a4a","#4a7d85","#e0c68a","#6b8f92"];
+  const PIE_COLORS = ["#56b2c1","#77b687","#e6aa48","#365bb6","#74afb5","#e28d56","#bebdbb"];
   const breakdownOverlay = document.getElementById("breakdownOverlay");
   let currentBreakdownType = "income";
 
