@@ -201,7 +201,7 @@
   .acct-line .a-sub{ font-size:12px; color: var(--ink-faint); display:block; text-align:right; }
 
   /* ---------- Breakdown ---------- */
-  .breakdown{ display:grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 34px; }
+  .breakdown{ display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 34px; }
   .bd-card{ background: var(--card); border-radius: 14px; padding: 18px 18px 12px; box-shadow: var(--shadow); }
   .bd-card.income{ background: var(--sage-soft); }
   .bd-card.expense{ background: var(--clay-soft); }
@@ -1625,7 +1625,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     sumBalance.textContent = fmt(income - expense);
 
     renderBreakdown(bdIncome, incomeByCat, income, "income");
-    renderBreakdown(bdExpense, expenseByCat, expense, "expense");
+    renderBreakdownPie(bdExpense, expenseByCat, expense);
     renderFxSummary(fxIncome, fxExpense);
     renderList(monthTx);
     renderAccounts();
@@ -1633,12 +1633,25 @@ enableIndexedDbPersistence(db).catch(() => {});
     renderTrendChart();
   }
 
+  function renderBreakdown(container, byCat, total, type){
+    container.innerHTML = "";
+    const entries = Object.entries(byCat).sort((a,b) => b[1]-a[1]);
+    if(entries.length === 0){ container.innerHTML = '<div class="bd-empty">本月尚無紀錄</div>'; return; }
+    entries.forEach(([cat, amt]) => {
+      const pct = total > 0 ? Math.round(amt/total*100) : 0;
+      const row = document.createElement("div");
+      row.className = "bd-row " + type;
+      row.innerHTML = `<div class="r-top"><span>${cat}</span><b>${fmt(amt)} · ${pct}%</b></div><div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>`;
+      container.appendChild(row);
+    });
+  }
+
   const PIE_COLORS = ["#c9793d","#93a163","#6f93a8","#c2841f","#a8703a","#7c8f7a","#b6704f","#8a97ad"];
   function polarToXY(cx, cy, r, angleDeg){
     const rad = (angleDeg - 90) * Math.PI / 180;
     return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
   }
-  function renderBreakdown(container, byCat, total, type){
+  function renderBreakdownPie(container, byCat, total){
     container.innerHTML = "";
     let entries = Object.entries(byCat).sort((a,b) => b[1]-a[1]);
     if(entries.length === 0 || total <= 0){ container.innerHTML = '<div class="bd-empty">本月尚無紀錄</div>'; return; }
@@ -1648,8 +1661,8 @@ enableIndexedDbPersistence(db).catch(() => {});
       entries = top.concat([["其他", restSum]]);
     }
     const catTotal = entries.reduce((s,[,v]) => s+v, 0);
-    const cx = 150, cy = 138, r = 66, gapDeg = 1.8;
-    const W = 300, H = 272;
+    const cx = 118, cy = 108, r = 46, gapDeg = 2;
+    const W = 236, H = 216;
     let startAngle = 0;
     const wedgeParts = [], labelParts = [];
     entries.forEach(([cat, amt], i) => {
@@ -1665,17 +1678,17 @@ enableIndexedDbPersistence(db).catch(() => {});
       }
       const midAngle = startAngle + sweep/2;
       const dotP = polarToXY(cx,cy,r+1,midAngle);
-      const labelP = polarToXY(cx,cy,r+38,midAngle);
+      const labelP = polarToXY(cx,cy,r+27,midAngle);
       const isRight = labelP.x >= cx;
-      const textX = isRight ? labelP.x + 7 : labelP.x - 7;
+      const textX = isRight ? labelP.x + 5 : labelP.x - 5;
       const anchor = isRight ? "start" : "end";
-      wedgeParts.push(`<line x1="${dotP.x.toFixed(1)}" y1="${dotP.y.toFixed(1)}" x2="${labelP.x.toFixed(1)}" y2="${labelP.y.toFixed(1)}" stroke="${color}" stroke-width="1.3" opacity="0.75"/>`);
-      wedgeParts.push(`<circle cx="${dotP.x.toFixed(1)}" cy="${dotP.y.toFixed(1)}" r="2.4" fill="${color}"/>`);
-      labelParts.push(`<text x="${textX.toFixed(1)}" y="${(labelP.y-3).toFixed(1)}" text-anchor="${anchor}" font-size="12.5" font-weight="700" fill="${color}">${Math.round(pct)}%</text>`);
-      labelParts.push(`<text x="${textX.toFixed(1)}" y="${(labelP.y+11).toFixed(1)}" text-anchor="${anchor}" font-size="10.5" fill="var(--ink-soft)">${cat}</text>`);
+      wedgeParts.push(`<line x1="${dotP.x.toFixed(1)}" y1="${dotP.y.toFixed(1)}" x2="${labelP.x.toFixed(1)}" y2="${labelP.y.toFixed(1)}" stroke="${color}" stroke-width="1" opacity="0.75"/>`);
+      wedgeParts.push(`<circle cx="${dotP.x.toFixed(1)}" cy="${dotP.y.toFixed(1)}" r="1.8" fill="${color}"/>`);
+      labelParts.push(`<text x="${textX.toFixed(1)}" y="${(labelP.y-2).toFixed(1)}" text-anchor="${anchor}" font-size="10.5" font-weight="700" fill="${color}">${Math.round(pct)}%</text>`);
+      labelParts.push(`<text x="${textX.toFixed(1)}" y="${(labelP.y+9).toFixed(1)}" text-anchor="${anchor}" font-size="9" fill="var(--ink-soft)">${cat}</text>`);
       startAngle += sweep;
     });
-    container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible;">${wedgeParts.join("")}${labelParts.join("")}</svg>`;
+    container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible;max-width:230px;margin:0 auto;">${wedgeParts.join("")}${labelParts.join("")}</svg>`;
   }
 
   function renderFxSummary(fxIncome, fxExpense){
