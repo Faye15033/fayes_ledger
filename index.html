@@ -244,7 +244,7 @@
 
   /* ---------- Breakdown (pie modal) ---------- */
   .bd-pie-wrap{ display:flex; justify-content:center; margin: 6px 0 22px; }
-  .bd-pie{ width: 200px; height:200px; border-radius:50%; box-shadow: var(--shadow); }
+  .bd-pie-wrap svg{ filter: drop-shadow(0 6px 14px rgba(51,64,74,0.15)); }
   .bd-legend{ display:flex; flex-direction:column; gap:10px; max-height: 260px; overflow-y:auto; }
   .bd-legend-row{ display:flex; align-items:center; gap:10px; font-size:14.5px; color: var(--ink); }
   .bd-swatch{ width:12px; height:12px; border-radius:50%; flex-shrink:0; }
@@ -1717,6 +1717,18 @@ enableIndexedDbPersistence(db).catch(() => {});
   const breakdownOverlay = document.getElementById("breakdownOverlay");
   let currentBreakdownType = "income";
 
+  function polarToXY(cx, cy, r, angleDeg){
+    const rad = angleDeg * Math.PI / 180;
+    return { x: cx + r * Math.sin(rad), y: cy - r * Math.cos(rad) };
+  }
+  function arcPath(cx, cy, r, startAngle, endAngle){
+    const p1 = polarToXY(cx, cy, r, startAngle);
+    const p2 = polarToXY(cx, cy, r, endAngle);
+    const largeArc = (endAngle - startAngle) > 180 ? 1 : 0;
+    return `M ${cx} ${cy} L ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} A ${r} ${r} 0 ${largeArc} 1 ${p2.x.toFixed(2)} ${p2.y.toFixed(2)} Z`;
+  }
+  const OTHER_COLOR = "#a9b4b8";
+
   function renderBreakdownModal(type){
     currentBreakdownType = type;
     const byCat = type === "income" ? lastIncomeByCat : lastExpenseByCat;
@@ -1724,25 +1736,45 @@ enableIndexedDbPersistence(db).catch(() => {});
     document.getElementById("breakdownTitle").textContent = type === "income" ? "收入分佈" : "支出分佈";
     const pieWrap = document.getElementById("bdPieWrap");
     const legend = document.getElementById("bdLegend");
-    const entries = Object.entries(byCat).sort((a,b) => b[1]-a[1]);
-    if(entries.length === 0 || total <= 0){
+    const sorted = Object.entries(byCat).sort((a,b) => b[1]-a[1]);
+    if(sorted.length === 0 || total <= 0){
       pieWrap.innerHTML = "";
       legend.innerHTML = '<div class="bd-empty">本月尚無紀錄</div>';
       return;
     }
-    let cum = 0;
-    const stops = entries.map(([cat, amt], i) => {
+    const top5 = sorted.slice(0, 5);
+    const rest = sorted.slice(5);
+    const entries = rest.length > 0
+      ? [...top5, ["其他", rest.reduce((s,[,amt]) => s+amt, 0)]]
+      : top5;
+
+    const cx = 130, cy = 130, r = 110, labelR = r * 0.66;
+    let angle = 0;
+    let svgParts = "";
+    entries.forEach(([cat, amt], i) => {
       const pct = amt / total * 100;
-      const start = cum; cum += pct;
-      return `${PIE_COLORS[i % PIE_COLORS.length]} ${start}% ${cum}%`;
-    }).join(", ");
-    pieWrap.innerHTML = `<div class="bd-pie" style="background: conic-gradient(${stops});"></div>`;
+      const sweep = pct / 100 * 360;
+      const start = angle, end = angle + sweep;
+      angle = end;
+      const color = cat === "其他" ? OTHER_COLOR : PIE_COLORS[i % PIE_COLORS.length];
+      svgParts += `<path d="${arcPath(cx, cy, r, start, end)}" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+      if(pct >= 5){
+        const mid = (start + end) / 2;
+        const pos = polarToXY(cx, cy, labelR, mid);
+        const pctLabel = pct >= 10 ? Math.round(pct) : pct.toFixed(1);
+        svgParts += `<text x="${pos.x.toFixed(2)}" y="${(pos.y-6).toFixed(2)}" text-anchor="middle" font-size="11.5" fill="#fff" font-family="Microsoft JhengHei,PingFang TC,Noto Sans TC,sans-serif" font-weight="600">${cat}</text>`;
+        svgParts += `<text x="${pos.x.toFixed(2)}" y="${(pos.y+9).toFixed(2)}" text-anchor="middle" font-size="12.5" fill="#fff" font-family="Microsoft JhengHei,PingFang TC,Noto Sans TC,sans-serif" font-weight="700">${pctLabel}%</text>`;
+      }
+    });
+    pieWrap.innerHTML = `<svg viewBox="0 0 260 260" width="230" height="230">${svgParts}</svg>`;
+
     legend.innerHTML = "";
     entries.forEach(([cat, amt], i) => {
       const pct = Math.round(amt / total * 100);
+      const color = cat === "其他" ? OTHER_COLOR : PIE_COLORS[i % PIE_COLORS.length];
       const row = document.createElement("div");
       row.className = "bd-legend-row";
-      row.innerHTML = `<span class="bd-swatch" style="background:${PIE_COLORS[i % PIE_COLORS.length]};"></span><span class="bd-legend-name">${cat}</span><span class="bd-legend-val">${fmt(amt)} · ${pct}%</span>`;
+      row.innerHTML = `<span class="bd-swatch" style="background:${color};"></span><span class="bd-legend-name">${cat}</span><span class="bd-legend-val">${fmt(amt)} · ${pct}%</span>`;
       legend.appendChild(row);
     });
   }
