@@ -597,13 +597,13 @@
       <div class="label">收入</div>
       <div class="cur-line" id="sumIncomeCur">HK$</div>
       <div class="num" id="sumIncome">0</div>
-      <div class="tap-hint">點看分佈 ›</div>
+      <div class="tap-hint">點擊展開 ›</div>
     </div>
     <div class="sum-card expense clickable" id="sumExpenseCard">
       <div class="label">支出</div>
       <div class="cur-line" id="sumExpenseCur">HK$</div>
       <div class="num" id="sumExpense">0</div>
-      <div class="tap-hint">點看分佈 ›</div>
+      <div class="tap-hint">點擊展開 ›</div>
     </div>
     <div class="sum-card balance">
       <div class="label">結餘</div>
@@ -1677,7 +1677,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
   }
   function renderBreakdownPie(container, byCat, total, opts){
-    const o = Object.assign({ cx:150, cy:140, r:70, gapDeg:2, W:300, H:280, labelGap:40, pctFont:13, catFont:11, maxWidth:280 }, opts||{});
+    const o = Object.assign({ cx:190, cy:180, r:94, gapDeg:2, W:380, H:360, labelGap:52, pctFont:15, catFont:12.5, maxWidth:380 }, opts||{});
     container.innerHTML = "";
     let entries = Object.entries(byCat).sort((a,b) => b[1]-a[1]);
     if(entries.length === 0 || total <= 0){ container.innerHTML = '<div class="bd-empty">本月尚無紀錄</div>'; return; }
