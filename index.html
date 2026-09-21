@@ -2298,6 +2298,10 @@ enableIndexedDbPersistence(db).catch(() => {});
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     if(!catValue.value){ showToast("請選擇分類"); return; }
+    if(activeType === "transfer" && fromAcctInput.value && fromAcctInput.value === toAcctInput.value){
+      showToast("轉出帳戶跟轉入帳戶不能是同一個");
+      return;
+    }
 
     const isFxTransfer = activeType === "transfer" && transferMode === "fx";
     let amt, cur, toAmt, toCur;
@@ -2587,6 +2591,10 @@ enableIndexedDbPersistence(db).catch(() => {});
     e.preventDefault();
     if(recurActiveType !== "transfer" && !recurCatValue.value){ showToast("請選擇分類"); return; }
     if(!recurStartDate.value){ showToast("請選擇起始日期"); return; }
+    if(recurActiveType === "transfer" && recurFromAcctInput.value && recurFromAcctInput.value === recurToAcctInput.value){
+      showToast("轉出帳戶跟轉入帳戶不能是同一個");
+      return;
+    }
 
     const isFxTransfer = recurActiveType === "transfer" && recurTransferMode === "fx";
     let amt, cur, toAmt, toCur;
