@@ -489,6 +489,11 @@
   }
   .ob-name-hint{ font-size:12.5px; color: var(--ink-faint); white-space:nowrap; }
   .ob-acct-del{ background:none; border:none; color: var(--ink-faint); cursor:pointer; font-size:14px; padding:2px 4px; flex-shrink:0; }
+  .ob-active-toggle{
+    display:flex; align-items:center; gap:3px; font-size:11.5px; color: var(--ink-faint);
+    white-space:nowrap; flex-shrink:0; cursor:pointer; user-select:none;
+  }
+  .ob-active-toggle input{ width:13px; height:13px; margin:0; cursor:pointer; accent-color: var(--gold); }
   .ob-acct-del:hover{ color: var(--clay-deep); }
   .ob-row{ display:grid; grid-template-columns: 1fr 1fr auto; gap:8px; margin-bottom:8px; align-items:center; }
   .ob-row select, .ob-row input{
@@ -967,6 +972,7 @@ enableIndexedDbPersistence(db).catch(() => {});
   const ONBOARD_KEY = "shiguang_ledger_onboarded_v1";
   const ACCOUNT_NAMES_KEY = "shiguang_ledger_account_names_v1";
   const CUSTOM_ACCOUNTS_KEY = "shiguang_ledger_custom_accounts_v1";
+  const HIDDEN_ACCOUNTS_KEY = "shiguang_ledger_hidden_accounts_v1";
 
   let transactions = [];
   try{ transactions = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }catch(e){ transactions = []; }
@@ -980,6 +986,18 @@ enableIndexedDbPersistence(db).catch(() => {});
   let customAccounts = []; // [{ id, name, kind, group, currency }]
   try{ customAccounts = JSON.parse(localStorage.getItem(CUSTOM_ACCOUNTS_KEY) || "[]"); }catch(e){ customAccounts = []; }
   function saveCustomAccountsLocal(){ localStorage.setItem(CUSTOM_ACCOUNTS_KEY, JSON.stringify(customAccounts)); }
+
+  let hiddenAccounts = []; // [accountId, ...] — excluded from "new entry" account dropdowns only
+  try{ hiddenAccounts = JSON.parse(localStorage.getItem(HIDDEN_ACCOUNTS_KEY) || "[]"); }catch(e){ hiddenAccounts = []; }
+  function saveHiddenAccountsLocal(){ localStorage.setItem(HIDDEN_ACCOUNTS_KEY, JSON.stringify(hiddenAccounts)); }
+  async function persistHiddenAccounts(){
+    saveHiddenAccountsLocal();
+    if(typeof refreshAccountLabelsUI === "function") refreshAccountLabelsUI();
+    if(currentUser){
+      try{ await setDoc(doc(db, "users", currentUser.uid, "settings", "hiddenAccounts"), { list: hiddenAccounts }); }
+      catch(e){ showToast("雲端同步失敗，稍後會自動重試"); }
+    }
+  }
 
   function rebuildAccounts(){
     ACCOUNTS.length = 0;
@@ -1019,6 +1037,7 @@ enableIndexedDbPersistence(db).catch(() => {});
   let unsubOpenings = null;
   let unsubAccountNames = null;
   let unsubCustomAccounts = null;
+  let unsubHiddenAccounts = null;
   let unsubCategories = null;
   let unsubFxRates = null;
   let unsubRecurring = null;
@@ -1117,6 +1136,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     if(unsubOpenings) unsubOpenings();
     if(unsubAccountNames) unsubAccountNames();
     if(unsubCustomAccounts) unsubCustomAccounts();
+    if(unsubHiddenAccounts) unsubHiddenAccounts();
     if(unsubCategories) unsubCategories();
     if(unsubFxRates) unsubFxRates();
     if(unsubRecurring) unsubRecurring();
@@ -1152,6 +1172,13 @@ enableIndexedDbPersistence(db).catch(() => {});
       render();
     }, () => {});
 
+    const hiddenAcctsDoc = doc(db, "users", uid, "settings", "hiddenAccounts");
+    unsubHiddenAccounts = onSnapshot(hiddenAcctsDoc, snap => {
+      hiddenAccounts = snap.exists() ? (snap.data().list || []) : [];
+      saveHiddenAccountsLocal();
+      refreshAccountLabelsUI();
+    }, () => {});
+
     const catsDoc = doc(db, "users", uid, "settings", "categories");
     unsubCategories = onSnapshot(catsDoc, snap => {
       if(snap.exists()){
@@ -1185,6 +1212,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     if(unsubOpenings){ unsubOpenings(); unsubOpenings = null; }
     if(unsubAccountNames){ unsubAccountNames(); unsubAccountNames = null; }
     if(unsubCustomAccounts){ unsubCustomAccounts(); unsubCustomAccounts = null; }
+    if(unsubHiddenAccounts){ unsubHiddenAccounts(); unsubHiddenAccounts = null; }
     if(unsubCategories){ unsubCategories(); unsubCategories = null; }
     if(unsubFxRates){ unsubFxRates(); unsubFxRates = null; }
     if(unsubRecurring){ unsubRecurring(); unsubRecurring = null; }
@@ -1944,15 +1972,31 @@ enableIndexedDbPersistence(db).catch(() => {});
   function fillAccountSelect(sel){
     sel.innerHTML = "";
     ACCOUNT_GROUPS.forEach(group => {
+      const groupAccts = ACCOUNTS.filter(a => a.group === group && !hiddenAccounts.includes(a.id));
+      if(groupAccts.length === 0) return;
       const og = document.createElement("optgroup");
       og.label = group;
-      ACCOUNTS.filter(a => a.group === group).forEach(a => {
+      groupAccts.forEach(a => {
         const opt = document.createElement("option");
         opt.value = a.id; opt.textContent = a.name;
         og.appendChild(opt);
       });
       sel.appendChild(og);
     });
+  }
+  function ensureAccountOptionExists(sel, accountId){
+    if(!accountId || !sel) return;
+    if(sel.querySelector(`option[value="${accountId}"]`)) { sel.value = accountId; return; }
+    const acct = getAccount(accountId);
+    if(!acct) return;
+    const opt = document.createElement("option");
+    opt.value = accountId; opt.textContent = acct.name + "（已閒置）";
+    opt.dataset.tempHidden = "1";
+    sel.appendChild(opt);
+    sel.value = accountId;
+  }
+  function clearTempHiddenOptions(){
+    document.querySelectorAll('option[data-temp-hidden="1"]').forEach(o => o.remove());
   }
   [acctInput, fromAcctInput, toAcctInput].forEach(fillAccountSelect);
 
@@ -2080,6 +2124,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     pendingRecurringContext = null;
     modalTitle.textContent = "新增一筆";
     formSaveBtn.textContent = "保 存";
+    clearTempHiddenOptions();
     resetFormToDefaultTab();
     dateInput.value = localDateStr();
     currencyInput.value = DEFAULT_CURRENCY;
@@ -2096,8 +2141,8 @@ enableIndexedDbPersistence(db).catch(() => {});
     dateInput.value = t.date;
     noteInput.value = t.note || "";
     if(t.type === "transfer"){
-      fromAcctInput.value = t.fromAccount || "";
-      toAcctInput.value = t.toAccount || "";
+      ensureAccountOptionExists(fromAcctInput, t.fromAccount);
+      ensureAccountOptionExists(toAcctInput, t.toAccount);
       const isFx = typeof t.toAmount === "number" && (t.toCurrency || t.currency || DEFAULT_CURRENCY) !== (t.currency || DEFAULT_CURRENCY);
       setTransferMode(isFx ? "fx" : "twd");
       if(isFx){
@@ -2111,7 +2156,7 @@ enableIndexedDbPersistence(db).catch(() => {});
         activeAmountInput = amountInput;
       }
     } else {
-      acctInput.value = t.account || "";
+      ensureAccountOptionExists(acctInput, t.account);
       currencyInput.value = t.currency || DEFAULT_CURRENCY;
       amountInput.value = t.amount;
       activeAmountInput = amountInput;
@@ -2130,8 +2175,8 @@ enableIndexedDbPersistence(db).catch(() => {});
     dateInput.value = targetDate;
     noteInput.value = rule.note || "";
     if(rule.type === "transfer"){
-      fromAcctInput.value = rule.fromAccount || "";
-      toAcctInput.value = rule.toAccount || "";
+      ensureAccountOptionExists(fromAcctInput, rule.fromAccount);
+      ensureAccountOptionExists(toAcctInput, rule.toAccount);
       const isFx = typeof rule.toAmount === "number" && (rule.toCurrency || rule.currency || DEFAULT_CURRENCY) !== (rule.currency || DEFAULT_CURRENCY);
       setTransferMode(isFx ? "fx" : "twd");
       if(isFx){
@@ -2145,7 +2190,7 @@ enableIndexedDbPersistence(db).catch(() => {});
         activeAmountInput = amountInput;
       }
     } else {
-      acctInput.value = rule.account || "";
+      ensureAccountOptionExists(acctInput, rule.account);
       currencyInput.value = rule.currency || DEFAULT_CURRENCY;
       amountInput.value = rule.amount;
       activeAmountInput = amountInput;
@@ -2162,6 +2207,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     pendingRecurringContext = null;
     modalTitle.textContent = "新增一筆";
     formSaveBtn.textContent = "保 存";
+    clearTempHiddenOptions();
   }
   fab.addEventListener("click", openModal);
   modalClose.addEventListener("click", closeModal);
@@ -2444,8 +2490,8 @@ enableIndexedDbPersistence(db).catch(() => {});
       recurDaySelect.value = String(rule.day);
       recurNoteInput.value = rule.note || "";
       if(rule.type === "transfer"){
-        recurFromAcctInput.value = rule.fromAccount || "";
-        recurToAcctInput.value = rule.toAccount || "";
+        ensureAccountOptionExists(recurFromAcctInput, rule.fromAccount);
+        ensureAccountOptionExists(recurToAcctInput, rule.toAccount);
         const isFx = typeof rule.toAmount === "number" && (rule.toCurrency || rule.currency || DEFAULT_CURRENCY) !== (rule.currency || DEFAULT_CURRENCY);
         recurSetTransferMode(isFx ? "fx" : "twd");
         if(isFx){
@@ -2457,7 +2503,7 @@ enableIndexedDbPersistence(db).catch(() => {});
           recurAmountInput.value = rule.amount;
         }
       } else {
-        recurAcctInput.value = rule.account || "";
+        ensureAccountOptionExists(recurAcctInput, rule.account);
         recurCurrencyInput.value = rule.currency || DEFAULT_CURRENCY;
         recurAmountInput.value = rule.amount;
         recurCatValue.value = rule.category || "";
@@ -2470,6 +2516,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     recurringFormOverlay.classList.remove("open");
     recurringForm.reset();
     editingRuleId = null;
+    clearTempHiddenOptions();
   }
 
   document.getElementById("recurringBtn").addEventListener("click", openRecurringList);
@@ -2851,6 +2898,23 @@ enableIndexedDbPersistence(db).catch(() => {});
           hint.textContent = "（未繳金額）";
           nameRow.appendChild(hint);
         }
+        const activeLabel = document.createElement("label");
+        activeLabel.className = "ob-active-toggle";
+        activeLabel.title = "關閉後，這個帳戶不會出現在「新增一筆」的帳戶選單裡";
+        const activeCheckbox = document.createElement("input");
+        activeCheckbox.type = "checkbox";
+        activeCheckbox.checked = !hiddenAccounts.includes(a.id);
+        activeCheckbox.addEventListener("change", () => {
+          if(activeCheckbox.checked){
+            hiddenAccounts = hiddenAccounts.filter(id => id !== a.id);
+          } else if(!hiddenAccounts.includes(a.id)){
+            hiddenAccounts.push(a.id);
+          }
+          persistHiddenAccounts();
+        });
+        activeLabel.appendChild(activeCheckbox);
+        activeLabel.appendChild(document.createTextNode("啟用"));
+        nameRow.appendChild(activeLabel);
         if(isCustom){
           const delBtn = document.createElement("button");
           delBtn.type = "button"; delBtn.className = "ob-acct-del"; delBtn.textContent = "🗑";
