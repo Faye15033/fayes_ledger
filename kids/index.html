@@ -120,15 +120,29 @@
   .landing-notices:empty{ display:none; }
   .notice-lead{ font-size:12.5px; font-weight:600; color: var(--accent-deep); margin: 0 0 10px; text-align:center; }
   .notice-warn{ list-style:none; margin:0 0 16px; padding:12px 14px; background: var(--accent-soft); border: 1.5px solid var(--accent); border-radius:12px; }
-  .notice-warn li{ font-size:12.5px; font-weight:400; color: var(--ink); line-height:1.7; margin-bottom:6px; }
+  .notice-warn li{ font-size:12.5px; font-weight:400; color: #2b2530; line-height:1.7; margin-bottom:6px; }
   .notice-warn li:last-child{ margin-bottom:0; }
-  .notice-section h3{ font-size:12.5px; font-weight:600; letter-spacing:0.1em; color: var(--ink); margin: 0 0 8px; }
+  .notice-section h3{ font-size:12.5px; font-weight:600; letter-spacing:0.1em; color: #2b2530; margin: 0 0 8px; }
   .notice-section ol{ margin:0; padding-left: 18px; }
-  .notice-section > ol > li{ font-size:12.5px; color: var(--ink); line-height:1.7; margin-bottom:12px; font-weight:400; }
-  .notice-sub{ font-size:12.5px; color: var(--ink); font-weight:400; line-height:1.7; margin: 4px 0; }
+  .notice-section > ol > li{ font-size:12.5px; color: #2b2530; line-height:1.7; margin-bottom:12px; font-weight:400; }
+  .notice-sub{ font-size:12.5px; color: #2b2530; font-weight:400; line-height:1.7; margin: 4px 0; }
   .notice-plain{ list-style:none; margin:4px 0 4px; padding:0; }
-  .notice-plain li{ font-size:12.5px; color: var(--ink); font-weight:400; line-height:1.7; margin-bottom:2px; }
+  .notice-plain li{ font-size:12.5px; color: #2b2530; font-weight:400; line-height:1.7; margin-bottom:2px; }
   .landing-notices b{ font-weight:400; }
+
+  .settings-menu-modal{ max-width: 340px; }
+  .settings-menu-item{
+    display:flex; align-items:center; gap:12px; width:100%; background: var(--card-soft);
+    border: 1.5px solid var(--line); border-radius:14px; padding: 14px 16px; margin-bottom:12px;
+    cursor:pointer; font-family: var(--font-main); text-align:left; transition: all .15s ease;
+  }
+  .settings-menu-item:hover{ border-color: var(--accent); background: var(--accent-soft); }
+  .settings-menu-item:last-child{ margin-bottom:0; }
+  .settings-menu-icon{ font-size:22px; flex-shrink:0; }
+  .settings-menu-text{ display:flex; flex-direction:column; gap:2px; flex:1; }
+  .settings-menu-text b{ font-size:14.5px; color: var(--ink); }
+  .settings-menu-text small{ font-size:11.5px; color: var(--ink-soft); }
+  .settings-menu-arrow{ font-size:18px; color: var(--ink-faint); }
   .auth-gate-btn{
     background: var(--accent); color:#fff; border:none; border-radius: 16px; padding: 12px 22px;
     font-size:14.5px; font-family: var(--font-main); font-weight:600; cursor:pointer; transition: all .15s ease;
@@ -575,6 +589,30 @@
     <h2>🐷 小小記帳本</h2>
     <p id="authGateMsg">請使用 Google 帳號登入，才能繼續使用記帳本</p>
     <button id="authGateBtn" class="auth-gate-btn">使用 Google 登入</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="settingsMenuOverlay">
+  <div class="modal settings-menu-modal">
+    <button class="cancel-x" id="settingsMenuClose">✕</button>
+    <h2>設定</h2>
+    <button type="button" class="settings-menu-item" id="settingsMenuAccounts">
+      <span class="settings-menu-icon">⚙</span>
+      <span class="settings-menu-text"><b>帳戶設定</b><small>各帳戶名稱及起始餘額</small></span>
+      <span class="settings-menu-arrow">›</span>
+    </button>
+    <button type="button" class="settings-menu-item" id="settingsMenuNotices">
+      <span class="settings-menu-icon">📌</span>
+      <span class="settings-menu-text"><b>注意事項</b><small>初次使用請詳閱</small></span>
+      <span class="settings-menu-arrow">›</span>
+    </button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="noticesModalOverlay">
+  <div class="modal">
+    <button class="cancel-x" id="noticesModalClose">✕</button>
+    <h2>注意事項</h2>
     <div class="landing-notices" id="landingNotices">
       <p class="notice-lead">初次登入請仔細閱讀並按步驟完成設定</p>
       <ul class="notice-warn">
@@ -2630,7 +2668,29 @@ function signOut(authArg){ return authArg.signOut(); }
     showToast("已更新帳戶金額");
   });
 
-  document.getElementById("settingsBtn").addEventListener("click", openOnboarding);
+  document.getElementById("settingsBtn").addEventListener("click", () => {
+    document.getElementById("settingsMenuOverlay").classList.add("open");
+  });
+  document.getElementById("settingsMenuClose").addEventListener("click", () => {
+    document.getElementById("settingsMenuOverlay").classList.remove("open");
+  });
+  document.getElementById("settingsMenuOverlay").addEventListener("click", (e) => {
+    if(e.target.id === "settingsMenuOverlay") document.getElementById("settingsMenuOverlay").classList.remove("open");
+  });
+  document.getElementById("settingsMenuAccounts").addEventListener("click", () => {
+    document.getElementById("settingsMenuOverlay").classList.remove("open");
+    openOnboarding();
+  });
+  document.getElementById("settingsMenuNotices").addEventListener("click", () => {
+    document.getElementById("settingsMenuOverlay").classList.remove("open");
+    document.getElementById("noticesModalOverlay").classList.add("open");
+  });
+  document.getElementById("noticesModalClose").addEventListener("click", () => {
+    document.getElementById("noticesModalOverlay").classList.remove("open");
+  });
+  document.getElementById("noticesModalOverlay").addEventListener("click", (e) => {
+    if(e.target.id === "noticesModalOverlay") document.getElementById("noticesModalOverlay").classList.remove("open");
+  });
 
   // ---------- Version note: ask GitHub when this file was last committed ----------
   async function loadVersionDate(){
