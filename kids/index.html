@@ -616,7 +616,7 @@
     <div class="landing-notices" id="landingNotices">
       <p class="notice-lead">初次登入請仔細閱讀並按步驟完成設定</p>
       <ul class="notice-warn">
-        <li>僅授權 <b>ck15033@gmail.com</b> 登入使用，未獲授權者無法瀏覽。</li>
+        <li>僅授權 <b>ck15033@gmail.com</b>、<b>readmemay@gmail.com</b> 登入使用，未獲授權者無法瀏覽。</li>
         <li>記帳資料只會儲存在登入者 Gmail 雲端硬碟中，網頁設計者無法讀取任何數據。建議至少每 2 週做一次匯出備份存檔。</li>
       </ul>
       <div class="notice-section">
@@ -914,7 +914,7 @@ const fbApp = firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 const googleProvider = new firebase.auth.GoogleAuthProvider();
-googleProvider.setCustomParameters({ login_hint: "ck15033@gmail.com" });
+// 現在有多組允許登入的帳號，不特別預帶其中一組，讓 Google 顯示一般的帳號選擇畫面
 db.enablePersistence().catch(() => {});
 
 // ---------- 相容用小工具：讓下面全部程式碼可以繼續用跟原本一樣的寫法 ----------
@@ -1260,7 +1260,7 @@ function signOut(authArg){ return authArg.signOut(); }
   function saveHiddenAccountsLocal(){ localStorage.setItem(hiddenAccountsKey(), JSON.stringify(hiddenAccountIds)); }
 
   // ---------- Cloud sync (Firebase) ----------
-  const ALLOWED_EMAIL = "ck15033@gmail.com";
+  const ALLOWED_EMAILS = ["ck15033@gmail.com", "readmemay@gmail.com"];
   let currentUser = null;
   function profileDocRef(uid, ...segments){ return doc(db, "users", uid, "profiles", activeProfileId, ...segments); }
   function profileColRef(uid, ...segments){ return collection(db, "users", uid, "profiles", activeProfileId, ...segments); }
@@ -1524,7 +1524,7 @@ function signOut(authArg){ return authArg.signOut(); }
   });
 
   onAuthStateChanged(auth, async (user) => {
-    if(user && user.email !== ALLOWED_EMAIL){
+    if(user && !ALLOWED_EMAILS.includes(user.email)){
       alert("這個帳本僅限特定 Google 帳號使用，這個帳號沒有存取權限，即將登出。");
       currentUser = null;
       await signOut(auth);
