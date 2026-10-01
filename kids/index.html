@@ -2395,6 +2395,13 @@ function signOut(authArg){ return authArg.signOut(); }
     const amt = evaluateExpr(amountInput.value);
     if(!amt || amt <= 0){ showToast("請輸入正確的金額或算式"); return; }
 
+    const txDateVal = dateInput.value;
+    const todayYM = localDateStr().slice(0,7);
+    if(txDateVal.slice(0,7) !== todayYM){
+      const ok = confirm("日期非當月，確定要用這個日期存檔嗎？");
+      if(!ok) return;
+    }
+
     const isEditing = !!editingTxId;
     const original = isEditing ? transactions.find(t => t.id === editingTxId) : null;
 
