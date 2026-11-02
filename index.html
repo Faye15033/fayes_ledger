@@ -302,6 +302,8 @@
   .mh-row.mh-header .mh-nums span{ color: var(--ink-faint) !important; font-size:11.5px; font-weight:500; letter-spacing:0.05em; }
   .mh-row .mh-nums{ min-width: 210px; justify-content:space-between; }
   .mh-row .mh-nums span{ min-width: 60px; text-align:right; }
+  .mh-click{ cursor:pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+  .mh-click:hover{ opacity:0.75; }
   .mh-empty{ color: var(--ink-faint); font-size:13px; padding: 10px 4px; }
 
   .trend-controls{ display:flex; align-items:center; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
@@ -1548,7 +1550,7 @@ enableIndexedDbPersistence(db).catch(() => {});
       const balSign = bal >= 0 ? "+" : "−";
       return `<div class="mh-row">
         <span class="mh-month">${y} 年 ${parseInt(m,10)} 月</span>
-        <span class="mh-nums"><span class="mh-in">+${fmt(d.income)}</span><span class="mh-out">−${fmt(d.expense)}</span><span class="${balClass}">${balSign}${fmt(Math.abs(bal))}</span></span>
+        <span class="mh-nums"><span class="mh-in mh-click" data-month="${key}" data-type="income">+${fmt(d.income)}</span><span class="mh-out mh-click" data-month="${key}" data-type="expense">−${fmt(d.expense)}</span><span class="${balClass}">${balSign}${fmt(Math.abs(bal))}</span></span>
       </div>`;
     }).join("");
   }
@@ -1562,6 +1564,12 @@ enableIndexedDbPersistence(db).catch(() => {});
     monthlyHistoryBtn.textContent = "+";
   }
   document.getElementById("monthlyHistoryToggle").addEventListener("click", toggleMonthlyHistory);
+  document.getElementById("monthlyHistoryList").addEventListener("click", (e) => {
+    const target = e.target.closest(".mh-click");
+    if(!target) return;
+    renderBreakdownModal(target.dataset.type, target.dataset.month);
+    breakdownOverlay.classList.add("open");
+  });
 
   const trendBtn = document.getElementById("trendBtn");
   const trendBody = document.getElementById("trendBody");
@@ -1771,7 +1779,7 @@ enableIndexedDbPersistence(db).catch(() => {});
 
     lastIncomeByCat = incomeByCat; lastExpenseByCat = expenseByCat;
     lastIncomeTotal = income; lastExpenseTotal = expense;
-    if(breakdownOverlay.classList.contains("open")) renderBreakdownModal(currentBreakdownType);
+    if(breakdownOverlay.classList.contains("open")) renderBreakdownModal(currentBreakdownType, currentBreakdownMonthKey);
     renderFxSummary(fxIncome, fxExpense);
     renderList(monthTx);
     renderAccounts();
@@ -1796,17 +1804,51 @@ enableIndexedDbPersistence(db).catch(() => {});
   }
   const OTHER_COLOR = "#a9b4b8";
 
-  function renderBreakdownModal(type){
+  let currentBreakdownMonthKey = null; // null = follow the month currently shown at the top
+
+  function computeMonthBreakdown(monthKey){
+    const incomeByCat = {}, expenseByCat = {};
+    let income = 0, expense = 0;
+    transactions.forEach(t => {
+      if(t.date.slice(0,7) !== monthKey) return;
+      if(t.type !== "income" && t.type !== "expense") return;
+      const cur = txCurrency(t);
+      let rate = 1;
+      if(cur !== DEFAULT_CURRENCY){
+        rate = fxRates[cur];
+        rate = (rate == null) ? 0 : rate;
+      }
+      const converted = t.amount * rate;
+      if(t.type === "income"){
+        income += converted; incomeByCat[t.category] = (incomeByCat[t.category]||0) + converted;
+      } else {
+        expense += converted; expenseByCat[t.category] = (expenseByCat[t.category]||0) + converted;
+      }
+    });
+    return { incomeByCat, expenseByCat, income, expense };
+  }
+
+  function renderBreakdownModal(type, monthKey){
     currentBreakdownType = type;
-    const byCat = type === "income" ? lastIncomeByCat : lastExpenseByCat;
-    const total = type === "income" ? lastIncomeTotal : lastExpenseTotal;
-    document.getElementById("breakdownTitle").textContent = type === "income" ? "收入分佈" : "支出分佈";
+    currentBreakdownMonthKey = monthKey || null;
+    let byCat, total, titleText = type === "income" ? "收入分佈" : "支出分佈";
+    if(currentBreakdownMonthKey){
+      const md = computeMonthBreakdown(currentBreakdownMonthKey);
+      byCat = type === "income" ? md.incomeByCat : md.expenseByCat;
+      total = type === "income" ? md.income : md.expense;
+      const [yy, mm] = currentBreakdownMonthKey.split("-");
+      titleText = `${yy} 年 ${parseInt(mm,10)} 月　${titleText}`;
+    } else {
+      byCat = type === "income" ? lastIncomeByCat : lastExpenseByCat;
+      total = type === "income" ? lastIncomeTotal : lastExpenseTotal;
+    }
+    document.getElementById("breakdownTitle").textContent = titleText;
     const pieWrap = document.getElementById("bdPieWrap");
     const legend = document.getElementById("bdLegend");
     const sorted = Object.entries(byCat).sort((a,b) => b[1]-a[1]);
     if(sorted.length === 0 || total <= 0){
       pieWrap.innerHTML = "";
-      legend.innerHTML = '<div class="bd-empty">本月尚無紀錄</div>';
+      legend.innerHTML = '<div class="bd-empty">這個月尚無紀錄</div>';
       return;
     }
     const top5 = sorted.slice(0, 5);
@@ -1846,11 +1888,11 @@ enableIndexedDbPersistence(db).catch(() => {});
     });
   }
   document.getElementById("sumIncomeCard").addEventListener("click", () => {
-    renderBreakdownModal("income");
+    renderBreakdownModal("income", null);
     breakdownOverlay.classList.add("open");
   });
   document.getElementById("sumExpenseCard").addEventListener("click", () => {
-    renderBreakdownModal("expense");
+    renderBreakdownModal("expense", null);
     breakdownOverlay.classList.add("open");
   });
   document.getElementById("breakdownClose").addEventListener("click", () => breakdownOverlay.classList.remove("open"));
