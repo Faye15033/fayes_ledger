@@ -302,6 +302,21 @@
   .mh-row.mh-header .mh-nums span{ color: var(--ink-faint) !important; font-size:11.5px; font-weight:500; letter-spacing:0.05em; }
   .mh-row .mh-nums{ min-width: 210px; justify-content:space-between; }
   .mh-row .mh-nums span{ min-width: 60px; text-align:right; }
+  .mh-row .mh-click{ cursor:pointer; text-decoration: underline dotted; text-underline-offset: 4px; text-decoration-color: var(--ink-faint); }
+  .mh-row .mh-click:hover{ text-decoration-style: solid; opacity: .8; }
+
+  /* ---------- Month category pie ---------- */
+  .pie-wrap{ display:flex; justify-content:center; margin: 4px 0 18px; }
+  .pie-wrap svg{ width: 100%; max-width: 240px; height:auto; display:block; }
+  .pie-legend-row{
+    display:flex; align-items:center; gap:10px; padding: 9px 4px; font-size:15px;
+    border-bottom: 1px dashed var(--line); min-width:0;
+  }
+  .pie-legend-row:last-child{ border-bottom:none; }
+  .pie-dot{ width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+  .pie-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pie-amt{ font-weight:700; white-space:nowrap; }
+  .pie-pct{ width: 56px; text-align:right; color: var(--ink-soft); font-size:14px; white-space:nowrap; }
   .mh-empty{ color: var(--ink-faint); font-size:13px; padding: 10px 4px; }
 
   .trend-controls{ display:flex; align-items:center; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
@@ -870,6 +885,17 @@
     <h2 id="breakdownTitle">收入分佈</h2>
     <div class="bd-pie-wrap" id="bdPieWrap"></div>
     <div class="bd-legend" id="bdLegend"></div>
+  </div>
+</div>
+
+<!-- Month category pie modal -->
+<div class="modal-overlay" id="pieOverlay">
+  <div class="modal">
+    <button class="cancel-x" id="pieClose">✕</button>
+    <h2 id="pieTitle"></h2>
+    <p class="sub" id="pieTotal"></p>
+    <div class="pie-wrap" id="pieChartWrap"></div>
+    <div id="pieLegend"></div>
   </div>
 </div>
 
@@ -1548,7 +1574,7 @@ enableIndexedDbPersistence(db).catch(() => {});
       const balSign = bal >= 0 ? "+" : "−";
       return `<div class="mh-row">
         <span class="mh-month">${y} 年 ${parseInt(m,10)} 月</span>
-        <span class="mh-nums"><span class="mh-in">+${fmt(d.income)}</span><span class="mh-out">−${fmt(d.expense)}</span><span class="${balClass}">${balSign}${fmt(Math.abs(bal))}</span></span>
+        <span class="mh-nums"><span class="mh-in mh-click" data-month="${key}" data-type="income" title="查看收入分類">+${fmt(d.income)}</span><span class="mh-out mh-click" data-month="${key}" data-type="expense" title="查看支出分類">−${fmt(d.expense)}</span><span class="${balClass}">${balSign}${fmt(Math.abs(bal))}</span></span>
       </div>`;
     }).join("");
   }
@@ -1562,6 +1588,76 @@ enableIndexedDbPersistence(db).catch(() => {});
     monthlyHistoryBtn.textContent = "+";
   }
   document.getElementById("monthlyHistoryToggle").addEventListener("click", toggleMonthlyHistory);
+
+  // ---------- Month category pie (click a month's income/expense) ----------
+  const PIE_COLORS = ["#7f9a68","#c07953","#8670b3","#bd8535","#5f8791","#b86b77","#9aa86b","#6f89b3","#c9a24d","#a07a9c","#6aa39a","#d18f6f","#8c8f99","#b5a36a","#7d6fa0"];
+  const pieOverlay = document.getElementById("pieOverlay");
+  function escHtml(s){ return String(s).replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch])); }
+  function openMonthPie(monthKey, type){
+    const totals = {};
+    transactions.forEach(t => {
+      if(t.type !== type) return;
+      if(t.date.slice(0,7) !== monthKey) return;
+      const cur = txCurrency(t);
+      let rate = 1;
+      if(cur !== DEFAULT_CURRENCY){ rate = fxRates[cur]; rate = (rate == null) ? 0 : rate; }
+      const v = t.amount * rate;
+      if(v <= 0) return;
+      totals[t.category] = (totals[t.category] || 0) + v;
+    });
+    const entries = Object.entries(totals).sort((a,b) => b[1] - a[1]);
+    const total = entries.reduce((s, e) => s + e[1], 0);
+    const label = type === "income" ? "收入" : "支出";
+    if(entries.length === 0 || total <= 0){ showToast("這個月沒有" + label + "紀錄"); return; }
+
+    const [y, m] = monthKey.split("-");
+    document.getElementById("pieTitle").textContent = `${y} 年 ${parseInt(m,10)} 月${label}分類`;
+    document.getElementById("pieTotal").textContent = `合計 ${currencySymbol(DEFAULT_CURRENCY)}${fmt(total, DEFAULT_CURRENCY)}`;
+
+    const cx = 100, cy = 100, r = 92;
+    let svg = `<svg viewBox="0 0 200 200" role="img" aria-label="${label}分類餅圖">`;
+    if(entries.length === 1){
+      svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${PIE_COLORS[0]}"/>`;
+      svg += `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="16" font-weight="700" fill="#fff">100%</text>`;
+    } else {
+      let angle = -Math.PI / 2;
+      entries.forEach(([name, v], i) => {
+        const frac = v / total;
+        const a2 = angle + frac * Math.PI * 2;
+        const x1 = cx + r * Math.cos(angle), y1 = cy + r * Math.sin(angle);
+        const x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
+        const large = frac > 0.5 ? 1 : 0;
+        const color = PIE_COLORS[i % PIE_COLORS.length];
+        svg += `<path d="M ${cx} ${cy} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z" fill="${color}" stroke="#fff" stroke-width="1.5"><title>${escHtml(name)}：${fmt(v, DEFAULT_CURRENCY)}（${(frac*100).toFixed(1)}%）</title></path>`;
+        if(frac >= 0.06){
+          const mid = angle + (a2 - angle) / 2;
+          const tx = cx + r * 0.62 * Math.cos(mid), ty = cy + r * 0.62 * Math.sin(mid);
+          svg += `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="700" fill="#fff" pointer-events="none">${Math.round(frac*100)}%</text>`;
+        }
+        angle = a2;
+      });
+    }
+    svg += `</svg>`;
+    document.getElementById("pieChartWrap").innerHTML = svg;
+
+    document.getElementById("pieLegend").innerHTML = entries.map(([name, v], i) => {
+      const color = PIE_COLORS[i % PIE_COLORS.length];
+      return `<div class="pie-legend-row">
+        <span class="pie-dot" style="background:${color}"></span>
+        <span class="pie-name">${escHtml(name)}</span>
+        <span class="pie-amt">${currencySymbol(DEFAULT_CURRENCY)}${fmt(v, DEFAULT_CURRENCY)}</span>
+        <span class="pie-pct">${(v / total * 100).toFixed(1)}%</span>
+      </div>`;
+    }).join("");
+    pieOverlay.classList.add("open");
+  }
+  document.getElementById("monthlyHistoryList").addEventListener("click", (e) => {
+    const el = e.target.closest(".mh-click");
+    if(!el) return;
+    openMonthPie(el.dataset.month, el.dataset.type);
+  });
+  document.getElementById("pieClose").addEventListener("click", () => pieOverlay.classList.remove("open"));
+  pieOverlay.addEventListener("click", (e) => { if(e.target === pieOverlay) pieOverlay.classList.remove("open"); });
 
   const trendBtn = document.getElementById("trendBtn");
   const trendBody = document.getElementById("trendBody");
