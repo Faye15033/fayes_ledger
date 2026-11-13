@@ -148,6 +148,7 @@
   .recur-item.type-expense{ border-left-color: var(--clay); }
   .recur-item.type-transfer{ border-left-color: var(--slate); }
   .recur-item-info{ font-size:15.5px; color: var(--ink); line-height:1.7; min-width:0; font-weight:500; }
+  .recur-hint{ font-size:13px; color: var(--ink-faint); margin: 6px 2px 0; line-height:1.6; }
   .recur-item-info .recur-sub{ font-size:13px; color: var(--ink-faint); font-weight:400; }
   .recur-item-actions{ display:flex; gap:8px; flex-shrink:0; }
   .recur-item-actions button{
@@ -843,13 +844,18 @@
 
       <div class="row-2">
         <div class="field">
-          <label>每月幾號</label>
-          <select id="recurDaySelect"></select>
+          <label>週期</label>
+          <select id="recurIntervalSelect"></select>
         </div>
         <div class="field">
-          <label>起始日期</label>
-          <input type="date" id="recurStartDate" required>
+          <label>幾號</label>
+          <select id="recurDaySelect"></select>
         </div>
+      </div>
+      <div class="field">
+        <label>起始日期</label>
+        <input type="date" id="recurStartDate" required>
+        <p class="recur-hint">起始日期所在的月份算第一次，之後依週期往後推（例如每 3 個月，從 1 月開始就是 1、4、7、10 月）。</p>
       </div>
       <div class="field">
         <label>結束日期（選填，隨時可改）</label>
@@ -2484,6 +2490,7 @@ enableIndexedDbPersistence(db).catch(() => {});
   const recurMainAmountRow = document.getElementById("recurMainAmountRow");
   const recurFxAmountFields = document.getElementById("recurFxAmountFields");
   const recurDaySelect = document.getElementById("recurDaySelect");
+  const recurIntervalSelect = document.getElementById("recurIntervalSelect");
   const recurStartDate = document.getElementById("recurStartDate");
   const recurEndDate = document.getElementById("recurEndDate");
   const recurNoteInput = document.getElementById("recurNoteInput");
@@ -2492,6 +2499,12 @@ enableIndexedDbPersistence(db).catch(() => {});
     const opt = document.createElement("option");
     opt.value = String(d); opt.textContent = d + " 號";
     recurDaySelect.appendChild(opt);
+  }
+  const INTERVAL_LABELS = { 1: "每月", 3: "每 3 個月（每季）", 6: "每 6 個月（每半年）", 12: "每年" };
+  for(let n=1; n<=12; n++){
+    const opt = document.createElement("option");
+    opt.value = String(n); opt.textContent = INTERVAL_LABELS[n] || ("每 " + n + " 個月");
+    recurIntervalSelect.appendChild(opt);
   }
 
   let recurActiveType = "expense";
@@ -2557,6 +2570,7 @@ enableIndexedDbPersistence(db).catch(() => {});
     recurStartDate.value = localDateStr();
     recurEndDate.value = "";
     recurDaySelect.value = "1";
+    recurIntervalSelect.value = "1";
     recurCurrencyInput.value = DEFAULT_CURRENCY;
     if(recurAcctInput.options.length) recurAcctInput.selectedIndex = 0;
     if(recurFromAcctInput.options.length) recurFromAcctInput.selectedIndex = 0;
@@ -2578,6 +2592,7 @@ enableIndexedDbPersistence(db).catch(() => {});
       recurStartDate.value = rule.startDate;
       recurEndDate.value = rule.endDate || "";
       recurDaySelect.value = String(rule.day);
+      recurIntervalSelect.value = String(rule.interval || 1);
       recurNoteInput.value = rule.note || "";
       if(rule.type === "transfer"){
         ensureAccountOptionExists(recurFromAcctInput, rule.fromAccount);
@@ -2631,7 +2646,12 @@ enableIndexedDbPersistence(db).catch(() => {});
       ? `${sym}${fmt(rule.amount, rule.currency)} → ${currencySymbol(rule.toCurrency)}${fmt(rule.toAmount, rule.toCurrency)}`
       : `${sym}${fmt(rule.amount, rule.currency)}`;
     const catText = rule.type === "transfer" ? "" : (rule.category ? rule.category : "");
-    const rangeText = "每月 " + rule.day + " 號　" + rule.startDate + " ～ " + (rule.endDate || "持續中");
+    const iv = rule.interval || 1;
+    let cycleText;
+    if(iv === 1) cycleText = "每月 " + rule.day + " 號";
+    else if(iv === 12) cycleText = "每年 " + parseInt(rule.startDate.split("-")[1], 10) + " 月 " + rule.day + " 號";
+    else cycleText = "每 " + iv + " 個月・" + rule.day + " 號";
+    const rangeText = cycleText + "　" + rule.startDate + " ～ " + (rule.endDate || "持續中");
     return { typeLabel, acctText, amtText, catText, rangeText };
   }
 
@@ -2707,6 +2727,7 @@ enableIndexedDbPersistence(db).catch(() => {});
       amount: amt,
       currency: cur,
       day: parseInt(recurDaySelect.value, 10),
+      interval: parseInt(recurIntervalSelect.value, 10) || 1,
       startDate: recurStartDate.value,
       endDate: recurEndDate.value || null,
       note: recurNoteInput.value.trim(),
@@ -2744,17 +2765,21 @@ enableIndexedDbPersistence(db).catch(() => {});
     recurringRules.forEach(rule => {
       if(!rule.startDate) return;
       let [y, m] = rule.startDate.split("-").map(Number);
-      let guard = 0;
+      const interval = Math.max(1, parseInt(rule.interval, 10) || 1);
+      let guard = 0, idx = 0;
       while((y < ty || (y === ty && m <= tm)) && guard < 600){
         guard++;
-        const key = recurMonthKey(y, m);
-        const targetDate = computeRuleTargetDate(rule, y, m);
-        const withinEnd = !rule.endDate || targetDate <= rule.endDate;
-        const alreadyHandled = rule.history && rule.history[key];
-        const snoozeKey = rule.id + "_" + key;
-        if(withinEnd && !alreadyHandled && targetDate <= today && !snoozedThisSession.has(snoozeKey)){
-          due.push({ rule, monthKey: key, targetDate });
+        if(idx % interval === 0){
+          const key = recurMonthKey(y, m);
+          const targetDate = computeRuleTargetDate(rule, y, m);
+          const withinEnd = !rule.endDate || targetDate <= rule.endDate;
+          const alreadyHandled = rule.history && rule.history[key];
+          const snoozeKey = rule.id + "_" + key;
+          if(withinEnd && !alreadyHandled && targetDate <= today && !snoozedThisSession.has(snoozeKey)){
+            due.push({ rule, monthKey: key, targetDate });
+          }
         }
+        idx++;
         m++; if(m > 12){ m = 1; y++; }
       }
     });
